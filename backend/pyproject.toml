@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Run pytest from the backend/ dir; "." on the path makes `import app...` work.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

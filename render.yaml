@@ -1,0 +1,21 @@
+# Render infra-as-code. Single Docker web service (builds the frontend and runs
+# the FastAPI backend that serves it). Postgres lives on Neon, so DATABASE_URL
+# and secrets are set manually in the Render dashboard (sync: false).
+services:
+  - type: web
+    name: watch-together
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # ~$7/mo, always-on (no cold starts)
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_URL # Neon pooled connection string
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: DEV_LOGIN
+        value: "false"
