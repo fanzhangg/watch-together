@@ -29,24 +29,41 @@ class Settings(BaseSettings):
     db_max_overflow: int = 2
     db_pool_recycle_seconds: int = 300
 
-    # --- Auth (used from M1) ---------------------------------------------
+    # --- Auth ------------------------------------------------------------
     session_secret: str = "dev-insecure-secret-change-me"
     google_client_id: str = ""
     # Local-only login bypass so the UI can be built before OAuth is wired.
     dev_login: bool = False
+    # Session cookie settings. secure=False for local http dev; set True in prod.
+    session_cookie_name: str = "wt_session"
+    session_cookie_secure: bool = False
+    session_max_age_seconds: int = 60 * 60 * 24 * 14  # 14 days
 
     # --- External APIs (used from M3) ------------------------------------
     tmdb_api_key: str = ""
 
     @property
     def database_url(self) -> str:
-        """Normalize the DB URL to the psycopg (v3) driver SQLAlchemy expects."""
+        """Resolve the SQLAlchemy URL.
+
+        - Empty -> a local SQLite file so the app runs with zero config in dev.
+        - Postgres schemes are normalized to the psycopg (v3) driver.
+        - SQLite / other URLs pass through unchanged.
+
+        Production sets ``DB_URL`` to the Neon pooled connection string.
+        """
         url = self.db_url
+        if not url:
+            return "sqlite:///./dev.db"
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         elif url.startswith("postgres://"):  # some providers use this scheme
             url = url.replace("postgres://", "postgresql+psycopg://", 1)
         return url
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
 
 
 @lru_cache

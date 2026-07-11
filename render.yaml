@@ -19,3 +19,5 @@ services:
         sync: false
       - key: DEV_LOGIN
         value: "false"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"

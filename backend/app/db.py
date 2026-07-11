@@ -26,16 +26,25 @@ def _init() -> sessionmaker[Session]:
     global _engine, _SessionLocal
     if _SessionLocal is None:
         settings = get_settings()
-        # pool_pre_ping guards against Neon closing idle connections; a small
-        # pool + recycle keeps us well under serverless connection limits.
-        _engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=True,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_max_overflow,
-            pool_recycle=settings.db_pool_recycle_seconds,
-            future=True,
-        )
+        if settings.is_sqlite:
+            # SQLite (local dev / tests) doesn't take the Postgres pool args.
+            _engine = create_engine(
+                settings.database_url,
+                connect_args={"check_same_thread": False},
+                future=True,
+            )
+        else:
+            # Postgres (Neon): pool_pre_ping guards against idle connections
+            # being closed on autosuspend; a small pool + recycle keeps us well
+            # under serverless connection limits.
+            _engine = create_engine(
+                settings.database_url,
+                pool_pre_ping=True,
+                pool_size=settings.db_pool_size,
+                max_overflow=settings.db_max_overflow,
+                pool_recycle=settings.db_pool_recycle_seconds,
+                future=True,
+            )
         _SessionLocal = sessionmaker(
             bind=_engine, autoflush=False, expire_on_commit=False
         )

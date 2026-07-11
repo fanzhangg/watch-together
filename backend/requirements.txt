@@ -8,6 +8,7 @@ python-dotenv==1.0.1
 
 # Auth (used from M1 onward)
 google-auth==2.37.0
+requests==2.32.3  # transport for google-auth token verification
 itsdangerous==2.2.0
 
 # HTTP client for the TMDB proxy (M3)

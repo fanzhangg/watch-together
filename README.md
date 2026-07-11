@@ -7,7 +7,7 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M0 — scaffold** (infra only; feature milestones M1–M6 to come).
+Status: **M1 — auth** (Google sign-in + dev-login session; lists/movies to come).
 
 ## Repo layout
 
@@ -71,13 +71,14 @@ cd frontend
 npm run dev
 ```
 
-Open <http://localhost:5173>. With both servers up it should read
-**"Backend health: ok"**. Vite hot-reloads, so once the backend is up just
-refresh the page.
+Open <http://localhost:5173>. With both servers up you'll see the sign-in
+state and a **Dev login** button (works when the backend runs with
+`DEV_LOGIN=true`, which is the default in `.env.example`). Vite hot-reloads, so
+once the backend is up just refresh the page.
 
-> **Note:** the backend runs fine on its own (health check, API, tests) without
-> a database — the engine connects lazily. A Postgres (`DB_URL`) is only needed
-> once real data tables land (M1+).
+> **Database:** local dev/test defaults to a **SQLite** file (`dev.db`) — zero
+> setup. Run migrations once before logging in: `alembic upgrade head` (creates
+> the `users` table). Production uses Postgres/Neon via `DB_URL`.
 
 ## Testing
 
@@ -91,9 +92,11 @@ pytest -v                         # verbose
 pytest tests/test_health.py       # a single file
 ```
 
-The M0 suite is a health-check smoke test (API reachable + the SPA catch-all
-doesn't shadow `/api`). From M2 onward, DB-backed tests run against a throwaway
-Postgres — see [docs/design.md](docs/design.md) section 11.
+Covers the health-check smoke test plus the M1 auth flow (me 401/200,
+dev-login, logout, Google upsert with verification mocked). Tests use an
+in-memory SQLite DB per test. From M2/M3 onward, DB-backed tests move to a
+throwaway Postgres for prod-accurate constraints — see
+[docs/design.md](docs/design.md) section 11.
 
 ### Frontend build check
 

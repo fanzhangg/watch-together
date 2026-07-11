@@ -12,6 +12,11 @@ venv/
 .env.*
 !.env.example
 
+# Local SQLite databases (dev/test)
+*.db
+*.sqlite
+*.sqlite3
+
 # Node / frontend
 node_modules/
 frontend/dist/
