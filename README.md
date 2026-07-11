@@ -27,45 +27,83 @@ docs/       Design doc
 - A **Neon** Postgres database (free tier) — optional until you need the DB;
   the API's health check runs without one.
 
-## Local development
+## Running the app locally
 
-Run the backend and frontend in two terminals. The Vite dev server proxies
-`/api` to the backend, so the browser sees a single origin (needed for the
-session cookie).
+> **You need TWO terminals running at once** — the backend and the frontend.
+> The Vite dev server proxies `/api` to the backend so the browser sees a single
+> origin (needed for the session cookie). If only the frontend is running, the
+> page shows **"Backend health: unreachable"** — that just means the backend
+> isn't up.
 
-### Backend
+### One-time setup
+
+```bash
+# Backend
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1        # Windows PowerShell
+# source .venv/bin/activate       # macOS/Linux
+pip install -r requirements-dev.txt
+cp .env.example .env              # fill in values as needed (optional for M0)
+
+# Frontend (in a separate shell)
+cd frontend
+npm install
+```
+
+### Every time — two terminals
+
+**Terminal 1 — backend** (leave running):
 
 ```bash
 cd backend
-python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# macOS/Linux:
-# source .venv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env          # then fill in values as needed
+.venv\Scripts\Activate.ps1        # Windows PowerShell
 uvicorn app.main:app --reload --port 8000
 ```
 
-Check it: <http://localhost:8000/api/health> → `{"status":"ok"}`
+Wait for `Uvicorn running on http://127.0.0.1:8000`. Sanity check:
+<http://localhost:8000/api/health> → `{"status":"ok"}`
 
-Run tests:
-
-```bash
-cd backend
-pytest
-```
-
-### Frontend
+**Terminal 2 — frontend** (leave running):
 
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
 
-Open <http://localhost:5173> — it shows the scaffold page and reports the
-backend health via the dev proxy.
+Open <http://localhost:5173>. With both servers up it should read
+**"Backend health: ok"**. Vite hot-reloads, so once the backend is up just
+refresh the page.
+
+> **Note:** the backend runs fine on its own (health check, API, tests) without
+> a database — the engine connects lazily. A Postgres (`DB_URL`) is only needed
+> once real data tables land (M1+).
+
+## Testing
+
+### Backend (pytest)
+
+```bash
+cd backend
+.venv\Scripts\Activate.ps1        # Windows PowerShell
+pytest                            # runs everything in backend/tests/
+pytest -v                         # verbose
+pytest tests/test_health.py       # a single file
+```
+
+The M0 suite is a health-check smoke test (API reachable + the SPA catch-all
+doesn't shadow `/api`). From M2 onward, DB-backed tests run against a throwaway
+Postgres — see [docs/design.md](docs/design.md) section 11.
+
+### Frontend build check
+
+No frontend tests yet (Playwright arrives with the UI in M5). To confirm the
+app compiles and the production bundle builds:
+
+```bash
+cd frontend
+npm run build                     # type-checks and builds into backend/app/web
+```
 
 ## Database migrations
 
