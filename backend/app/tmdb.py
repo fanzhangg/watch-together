@@ -35,6 +35,11 @@ class TMDBNotConfigured(RuntimeError):
     """No TMDB_API_KEY is set. Routes map this to a 503."""
 
 
+class TMDBNotFound(RuntimeError):
+    """TMDB has no such movie. A caller mistake, so routes map this to a 404
+    rather than a 502 — it isn't a gateway failure."""
+
+
 @dataclass
 class Movie:
     tmdb_id: int
@@ -87,8 +92,11 @@ def _get(api_key: str, path: str, params: dict) -> dict:
         else:
             if resp.status_code == 200:
                 return resp.json()
+            if resp.status_code == 404:
+                # The caller asked for a movie that doesn't exist — not our fault.
+                raise TMDBNotFound(f"No TMDB movie for {path}")
             if resp.status_code < 500:
-                # 401 bad key, 404 unknown movie — retrying won't help.
+                # e.g. 401 bad key — retrying won't help.
                 raise TMDBError(f"TMDB returned {resp.status_code}")
             last_error = f"TMDB returned {resp.status_code}"
 

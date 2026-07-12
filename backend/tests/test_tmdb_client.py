@@ -12,7 +12,13 @@ import httpx
 import pytest
 
 from app import tmdb
-from app.tmdb import TMDBError, TMDBNotConfigured, get_movie, search_movies
+from app.tmdb import (
+    TMDBError,
+    TMDBNotConfigured,
+    TMDBNotFound,
+    get_movie,
+    search_movies,
+)
 
 MATRIX_PAYLOAD = {
     "id": 603,
@@ -82,6 +88,23 @@ def test_client_error_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(TMDBError):
         search_movies("bad-key", "matrix")
+    assert calls["n"] == 1
+
+
+def test_not_found_raises_not_found_and_is_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unknown movie id is a caller mistake: distinct exception, no retries."""
+    calls = {"n": 0}
+
+    def missing(url: str, params: dict) -> httpx.Response:
+        calls["n"] += 1
+        return _response(404)
+
+    monkeypatch.setattr(tmdb, "_fetch", missing)
+
+    with pytest.raises(TMDBNotFound):
+        get_movie("key", 99999999)
     assert calls["n"] == 1
 
 

@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models import User
-from app.tmdb import Movie, TMDBError
+from app.tmdb import Movie, TMDBError, TMDBNotFound
 
 MATRIX = Movie(
     tmdb_id=603,
@@ -172,6 +172,36 @@ def test_stranger_cannot_touch_items(
         == 403
     )
     assert cb.delete(f"/api/lists/{lid}/items/{iid}").status_code == 403
+
+
+def test_unknown_tmdb_id_maps_to_404_not_502(
+    client_factory: Callable[..., TestClient],
+    alice: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Asking for a movie TMDB doesn't have is a caller mistake, not a gateway
+    failure — it must be a 404, not a 502."""
+
+    def not_found(key: str, tmdb_id: int) -> Movie:
+        raise TMDBNotFound("no such movie")
+
+    monkeypatch.setattr("app.routers.items.get_movie", not_found)
+
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    resp = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 99999999})
+    assert resp.status_code == 404
+
+
+def test_add_item_documents_both_200_and_201(
+    client_factory: Callable[..., TestClient],
+) -> None:
+    """Swagger should show 201 (added) and 200 (already present), not just 200."""
+    schema = client_factory().get("/openapi.json").json()
+    responses = schema["paths"]["/api/lists/{list_id}/items"]["post"]["responses"]
+    assert "201" in responses
+    assert "200" in responses
+    assert "422" in responses  # validation errors are documented by FastAPI
 
 
 def test_tmdb_failure_maps_to_502(

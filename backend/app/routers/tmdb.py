@@ -17,7 +17,17 @@ from app.tmdb import TMDBError, TMDBNotConfigured, search_movies
 router = APIRouter(prefix="/api/tmdb", tags=["tmdb"])
 
 
-@router.get("/search", response_model=list[MovieSearchResult])
+@router.get(
+    "/search",
+    response_model=list[MovieSearchResult],
+    summary="Search TMDB for movies by title",
+    responses={
+        200: {"description": "Matching movies (may be an empty list)"},
+        401: {"description": "Not authenticated"},
+        502: {"description": "TMDB is unreachable"},
+        503: {"description": "TMDB is not configured (TMDB_API_KEY unset)"},
+    },
+)
 def search(
     q: str = Query(min_length=1, description="Movie title to search for"),
     _user: User = Depends(get_current_user),

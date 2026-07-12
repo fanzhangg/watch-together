@@ -13,7 +13,7 @@ from app.db import get_db
 from app.deps import ListContext, get_current_user, require_list_member
 from app.models import User
 from app.schemas import ItemCreate, ItemOut, ItemUpdate
-from app.tmdb import TMDBError, TMDBNotConfigured, get_movie
+from app.tmdb import TMDBError, TMDBNotConfigured, TMDBNotFound, get_movie
 
 router = APIRouter(prefix="/api/lists/{list_id}/items", tags=["items"])
 
@@ -26,7 +26,24 @@ def get_items(
     return [ItemOut.model_validate(i) for i in crud.get_items(db, ctx.list.id)]
 
 
-@router.post("", response_model=ItemOut)
+@router.post(
+    "",
+    response_model=ItemOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a movie to the list",
+    responses={
+        201: {"description": "Movie added to the list"},
+        200: {
+            "model": ItemOut,
+            "description": "Movie was already in the list — the existing item is "
+            "returned unchanged (idempotent; no TMDB call is made)",
+        },
+        403: {"description": "Not a member of this list"},
+        404: {"description": "TMDB has no movie with that id"},
+        502: {"description": "TMDB is unreachable"},
+        503: {"description": "TMDB is not configured (TMDB_API_KEY unset)"},
+    },
+)
 def add_item(
     payload: ItemCreate,
     response: Response,
@@ -54,6 +71,11 @@ def add_item(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="TMDB is not configured (set TMDB_API_KEY)",
         )
+    except TMDBNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"TMDB has no movie with id {payload.tmdb_id}",
+        )
     except TMDBError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
@@ -70,7 +92,16 @@ def add_item(
     return ItemOut.model_validate(item)
 
 
-@router.patch("/{item_id}", response_model=ItemOut)
+@router.patch(
+    "/{item_id}",
+    response_model=ItemOut,
+    summary="Change a movie's watched status",
+    responses={
+        200: {"description": "Status updated; watched_at is set or cleared to match"},
+        403: {"description": "Not a member of this list"},
+        404: {"description": "No such item in this list"},
+    },
+)
 def update_item(
     item_id: uuid.UUID,
     payload: ItemUpdate,
@@ -83,7 +114,16 @@ def update_item(
     return ItemOut.model_validate(crud.set_item_status(db, item, payload.status))
 
 
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a movie from the list",
+    responses={
+        204: {"description": "Movie removed"},
+        403: {"description": "Not a member of this list"},
+        404: {"description": "No such item in this list"},
+    },
+)
 def delete_item(
     item_id: uuid.UUID,
     ctx: ListContext = Depends(require_list_member),
