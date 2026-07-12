@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # --- External APIs (used from M3) ------------------------------------
     tmdb_api_key: str = ""
 
+    # --- App ---------------------------------------------------------------
+    # Public base URL used to build share links, e.g. https://host/invite/<code>.
+    # In production the SPA and API share an origin, so the request's own base
+    # URL is right; in dev the SPA is on :5173 while the API is on :8000, so set
+    # APP_BASE_URL=http://localhost:5173 to get clickable invite links.
+    app_base_url: str = ""
+
     @property
     def database_url(self) -> str:
         """Resolve the SQLAlchemy URL.

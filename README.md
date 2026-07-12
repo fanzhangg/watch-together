@@ -7,8 +7,8 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M3 — movies** (TMDB search + add/track movies in a list; invites and
-UI to come).
+Status: **M4 — invites** (backend complete: auth, shared lists, TMDB movies,
+invite links). Next: the React UI (M5), then deploy (M6).
 
 ## Repo layout
 

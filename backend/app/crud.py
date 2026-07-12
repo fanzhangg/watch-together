@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +14,7 @@ from app.models import (
     ROLE_MEMBER,
     ROLE_OWNER,
     STATUS_WATCHED,
+    Invite,
     List,
     ListItem,
     ListMember,
@@ -214,6 +216,76 @@ def add_item(
 
     db.refresh(item)
     return item, True
+
+
+# --- Invites -------------------------------------------------------------
+# 16 random bytes -> ~22 url-safe chars. The code IS the secret that grants
+# access, so it must come from a CSPRNG (secrets), never random/uuid1.
+INVITE_CODE_BYTES = 16
+
+
+def create_invite(
+    db: Session,
+    *,
+    list_id: uuid.UUID,
+    created_by: User,
+    expires_in_days: int | None = None,
+) -> Invite:
+    expires_at = (
+        datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+        if expires_in_days is not None
+        else None
+    )
+    invite = Invite(
+        list_id=list_id,
+        code=secrets.token_urlsafe(INVITE_CODE_BYTES),
+        created_by=created_by.id,
+        expires_at=expires_at,
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+    return invite
+
+
+def get_invite_by_code(db: Session, code: str) -> Invite | None:
+    return db.execute(
+        select(Invite).where(Invite.code == code)
+    ).scalar_one_or_none()
+
+
+def invite_is_expired(invite: Invite) -> bool:
+    if invite.expires_at is None:
+        return False
+    expires_at = invite.expires_at
+    if expires_at.tzinfo is None:
+        # SQLite round-trips naive datetimes; treat them as UTC.
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= datetime.now(timezone.utc)
+
+
+def accept_invite(db: Session, invite: Invite, user: User) -> ListMember:
+    """Join the invite's list. Idempotent, and never changes an existing role —
+    re-accepting must not demote the owner to a plain member."""
+    existing = get_membership(db, invite.list_id, user.id)
+    if existing is not None:
+        return existing
+
+    membership = ListMember(
+        list_id=invite.list_id, user_id=user.id, role=ROLE_MEMBER
+    )
+    db.add(membership)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Raced with another accept of the same invite.
+        db.rollback()
+        existing = get_membership(db, invite.list_id, user.id)
+        if existing is None:
+            raise
+        return existing
+    db.refresh(membership)
+    return membership
 
 
 def set_item_status(db: Session, item: ListItem, status: str) -> ListItem:

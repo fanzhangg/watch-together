@@ -32,6 +32,7 @@ __all__ = [
     "List",
     "ListMember",
     "ListItem",
+    "Invite",
     "ROLE_OWNER",
     "ROLE_MEMBER",
     "STATUS_WANT",
@@ -85,6 +86,29 @@ class ListMember(Base):
     )
     role: Mapped[str] = mapped_column(String, nullable=False, default=ROLE_MEMBER)
     joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Invite(Base):
+    """A shareable code that lets whoever opens it join a list.
+
+    Multi-use until it expires (expires_at NULL = never). The code itself is the
+    secret, so it must be generated with a CSPRNG — never a guessable sequence.
+    """
+
+    __tablename__ = "invites"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("lists.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

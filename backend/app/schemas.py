@@ -93,3 +93,25 @@ class ItemOut(BaseModel):
     added_by: uuid.UUID
     watched_at: datetime | None = None
     created_at: datetime
+
+
+# --- Invites -------------------------------------------------------------
+class InviteCreate(BaseModel):
+    # Optional lifetime. Omit for a link that never expires.
+    expires_in_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class InviteOut(BaseModel):
+    code: str
+    url: str
+    list_id: uuid.UUID
+    expires_at: datetime | None = None
+
+
+class InvitePreview(BaseModel):
+    """Shown before accepting, so you know what you're joining."""
+
+    code: str
+    list_name: str
+    invited_by: str
+    expires_at: datetime | None = None
