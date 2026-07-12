@@ -7,8 +7,8 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M4 — invites** (backend complete: auth, shared lists, TMDB movies,
-invite links). Next: the React UI (M5), then deploy (M6).
+Status: **M5 — UI complete** (sign in, create lists, search TMDB, add movies,
+mark watched, invite someone). Next: deploy to Render (M6).
 
 ## Repo layout
 
@@ -111,15 +111,29 @@ pytest
 
 See [docs/design.md](docs/design.md) section 11.
 
-### Frontend build check
-
-No frontend tests yet (Playwright arrives with the UI in M5). To confirm the
-app compiles and the production bundle builds:
+### Frontend
 
 ```bash
 cd frontend
+npm run typecheck                 # tsc --noEmit
 npm run build                     # type-checks and builds into backend/app/web
 ```
+
+### End-to-end (Playwright)
+
+The e2e suite drives the real UI in a browser against the **built** app served
+by FastAPI — i.e. exactly how production runs (one origin, no dev proxy):
+
+```bash
+cd frontend && npm run build                      # 1. build the SPA
+cd ../backend && uvicorn app.main:app --port 8020 # 2. serve it (DEV_LOGIN=true,
+                                                  #    TMDB_API_KEY set)
+cd ../frontend && npm run e2e                     # 3. drive it
+```
+
+It covers the happy path (sign in → create list → search TMDB → add movie →
+mark watched → invite link) and the signed-out invite preview. First run needs
+`npx playwright install chromium`.
 
 ## Database migrations
 

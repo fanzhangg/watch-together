@@ -1,59 +1,38 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type User } from "./api";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useMe } from "./auth";
+import Layout from "./components/Layout";
+import InvitePage from "./pages/InvitePage";
+import ListPage from "./pages/ListPage";
+import ListsPage from "./pages/ListsPage";
+import LoginPage from "./pages/LoginPage";
 
-// M1 placeholder UI: shows auth state and exercises the dev-login / logout
-// flow end to end. The real Google sign-in button and app routes arrive in
-// later milestones per docs/design.md.
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { data: user, isPending } = useMe();
+  const location = useLocation();
+
+  if (isPending) return <p className="container muted">Loading…</p>;
+  // Remember where they were headed so login can send them back.
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
+  return <>{children}</>;
+}
+
 export default function App() {
-  const qc = useQueryClient();
-
-  const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ["me"],
-    queryFn: async () => {
-      try {
-        return await api.me();
-      } catch {
-        return null; // 401 -> not logged in
-      }
-    },
-  });
-
-  const login = useMutation({
-    mutationFn: api.devLogin,
-    onSuccess: (u) => qc.setQueryData(["me"], u),
-  });
-  const logout = useMutation({
-    mutationFn: api.logout,
-    onSuccess: () => qc.setQueryData(["me"], null),
-  });
-
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      <h1>🎬 Watch Together</h1>
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : user ? (
-        <>
-          <p>
-            Signed in as <strong>{user.display_name ?? user.email}</strong> (
-            {user.email})
-          </p>
-          <button onClick={() => logout.mutate()} disabled={logout.isPending}>
-            Log out
-          </button>
-        </>
-      ) : (
-        <>
-          <p>You are not signed in.</p>
-          <button onClick={() => login.mutate()} disabled={login.isPending}>
-            Dev login
-          </button>
-          <p style={{ color: "#888", fontSize: "0.9rem" }}>
-            (Dev login works when the backend runs with <code>DEV_LOGIN=true</code>.
-            Google sign-in comes later.)
-          </p>
-        </>
-      )}
-    </main>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      {/* Public: you can see what you were invited to before signing in. */}
+      <Route path="/invite/:code" element={<InvitePage />} />
+      <Route
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
+        <Route path="/" element={<ListsPage />} />
+        <Route path="/lists/:id" element={<ListPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

@@ -20,6 +20,7 @@ venv/
 # Node / frontend
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 # Built frontend served by the backend
 backend/app/web/
 
