@@ -17,6 +17,10 @@ import httpx
 
 BASE_URL = "https://api.themoviedb.org/3"
 TIMEOUT_SECONDS = 10.0
+# Connections to TMDB are occasionally reset mid-handshake on some networks.
+# httpx retries only connection-level failures here (never a completed request),
+# so this is safe for the non-idempotent-looking GETs too.
+CONNECT_RETRIES = 3
 
 
 class TMDBError(RuntimeError):
@@ -59,13 +63,13 @@ def _to_movie(raw: dict) -> Movie:
 def _get(api_key: str, path: str, params: dict) -> dict:
     if not api_key:
         raise TMDBNotConfigured("TMDB_API_KEY is not set")
+    transport = httpx.HTTPTransport(retries=CONNECT_RETRIES)
     try:
-        resp = httpx.get(
-            f"{BASE_URL}{path}",
-            params={"api_key": api_key, **params},
-            timeout=TIMEOUT_SECONDS,
-        )
-    except httpx.HTTPError as exc:  # network/timeout
+        with httpx.Client(transport=transport, timeout=TIMEOUT_SECONDS) as client:
+            resp = client.get(
+                f"{BASE_URL}{path}", params={"api_key": api_key, **params}
+            )
+    except httpx.HTTPError as exc:  # network/timeout, after retries
         raise TMDBError(f"TMDB request failed: {exc}") from exc
     if resp.status_code != 200:
         raise TMDBError(f"TMDB returned {resp.status_code}")

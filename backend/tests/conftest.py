@@ -33,12 +33,20 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 @pytest.fixture
 def settings() -> Settings:
+    """Deterministic settings for tests.
+
+    ``_env_file=None`` stops pydantic-settings reading the developer's local
+    .env, and every field is set explicitly — otherwise a real TMDB_API_KEY in
+    .env would leak in and make tests hit the live TMDB API.
+    """
     return Settings(
+        _env_file=None,
         db_url="sqlite://",
         session_secret="test-secret",
         google_client_id="test-client-id",
         dev_login=True,
         session_cookie_secure=False,
+        tmdb_api_key="",  # unset -> TMDB routes must return 503, never call out
     )
 
 

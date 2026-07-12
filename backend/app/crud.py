@@ -159,6 +159,14 @@ def get_item(db: Session, list_id: uuid.UUID, item_id: uuid.UUID) -> ListItem | 
     ).scalar_one_or_none()
 
 
+def get_item_by_tmdb(db: Session, list_id: uuid.UUID, tmdb_id: int) -> ListItem | None:
+    return db.execute(
+        select(ListItem).where(
+            ListItem.list_id == list_id, ListItem.tmdb_id == tmdb_id
+        )
+    ).scalar_one_or_none()
+
+
 def add_item(
     db: Session,
     *,

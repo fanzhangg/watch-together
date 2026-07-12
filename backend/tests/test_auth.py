@@ -45,7 +45,10 @@ def test_logout_clears_session(client: TestClient) -> None:
 def test_dev_login_disabled_returns_404(client: TestClient) -> None:
     # Re-point settings so DEV_LOGIN is off for this request.
     app.dependency_overrides[get_settings] = lambda: Settings(
-        db_url="sqlite://", session_secret="test-secret", dev_login=False
+        _env_file=None,
+        db_url="sqlite://",
+        session_secret="test-secret",
+        dev_login=False,
     )
     resp = client.post("/api/auth/dev-login")
     assert resp.status_code == 404

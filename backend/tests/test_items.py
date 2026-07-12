@@ -119,6 +119,33 @@ def test_duplicate_add_is_idempotent(
     assert len(ca.get(f"/api/lists/{lid}/items").json()) == 1
 
 
+def test_duplicate_add_does_not_call_tmdb(
+    client_factory: Callable[..., TestClient],
+    alice: User,
+    mock_tmdb: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A movie already in the list needs no metadata, so it must not hit TMDB.
+
+    Regression: the existence check used to run *after* the TMDB fetch, so a
+    flaky TMDB turned a harmless duplicate add into a 502.
+    """
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    first = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603})
+    assert first.status_code == 201
+
+    # Now make TMDB completely unavailable.
+    def boom(key: str, tmdb_id: int) -> Movie:
+        raise TMDBError("TMDB is down")
+
+    monkeypatch.setattr("app.routers.items.get_movie", boom)
+
+    second = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603})
+    assert second.status_code == 200  # still fine — no TMDB call needed
+    assert second.json()["id"] == first.json()["id"]
+
+
 def test_delete_item(
     client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
 ) -> None:

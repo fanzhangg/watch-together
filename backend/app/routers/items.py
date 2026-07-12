@@ -38,8 +38,15 @@ def add_item(
     """Add a movie by TMDB id; the backend snapshots its metadata.
 
     Idempotent: re-adding a film already in the list returns the existing item
-    with 200 instead of failing on the UNIQUE constraint.
+    with 200 instead of failing on the UNIQUE constraint. The existence check
+    happens BEFORE the TMDB call, so a duplicate add costs no network request
+    and still succeeds even when TMDB is unreachable.
     """
+    existing = crud.get_item_by_tmdb(db, ctx.list.id, payload.tmdb_id)
+    if existing is not None:
+        response.status_code = status.HTTP_200_OK
+        return ItemOut.model_validate(existing)
+
     try:
         movie = get_movie(settings.tmdb_api_key, payload.tmdb_id)
     except TMDBNotConfigured:
