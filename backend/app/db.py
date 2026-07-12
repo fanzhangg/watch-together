@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -20,6 +20,17 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
+
+
+def enable_sqlite_fk(engine: Engine) -> None:
+    """SQLite ignores ON DELETE CASCADE unless foreign keys are enabled per
+    connection. Postgres enforces them natively; this is a no-op there."""
+
+    @event.listens_for(engine, "connect")
+    def _set_pragma(dbapi_conn, _record):  # type: ignore[no-untyped-def]
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def _init() -> sessionmaker[Session]:
@@ -33,6 +44,7 @@ def _init() -> sessionmaker[Session]:
                 connect_args={"check_same_thread": False},
                 future=True,
             )
+            enable_sqlite_fk(_engine)
         else:
             # Postgres (Neon): pool_pre_ping guards against idle connections
             # being closed on autosuspend; a small pool + recycle keeps us well

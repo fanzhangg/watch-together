@@ -7,7 +7,8 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M1 — auth** (Google sign-in + dev-login session; lists/movies to come).
+Status: **M2 — lists + membership** (create/share lists with access control;
+movies/invites to come).
 
 ## Repo layout
 
@@ -92,11 +93,19 @@ pytest -v                         # verbose
 pytest tests/test_health.py       # a single file
 ```
 
-Covers the health-check smoke test plus the M1 auth flow (me 401/200,
-dev-login, logout, Google upsert with verification mocked). Tests use an
-in-memory SQLite DB per test. From M2/M3 onward, DB-backed tests move to a
-throwaway Postgres for prod-accurate constraints — see
-[docs/design.md](docs/design.md) section 11.
+Covers the health-check smoke test, the M1 auth flow, and the M2 list
+membership/403 access-control tests. Tests use an in-memory SQLite DB per test
+by default.
+
+To run the **same tests against real Postgres** (prod-accurate constraints —
+recommended from M2 on), point them at a throwaway Neon branch:
+
+```powershell
+$env:TEST_DATABASE_URL = "<neon test-branch pooled connection string>"
+pytest
+```
+
+See [docs/design.md](docs/design.md) section 11.
 
 ### Frontend build check
 
