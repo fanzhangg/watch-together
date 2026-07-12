@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -52,3 +53,43 @@ class ListOut(BaseModel):
 
 class ListDetail(ListOut):
     members: list[MemberOut]
+
+
+# --- Movies / list items -------------------------------------------------
+Status = Literal["want_to_watch", "watched"]
+
+
+class MovieSearchResult(BaseModel):
+    """A trimmed TMDB search hit — never the raw TMDB payload."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tmdb_id: int
+    title: str
+    release_year: int | None = None
+    poster_path: str | None = None
+    overview: str | None = None
+
+
+class ItemCreate(BaseModel):
+    tmdb_id: int
+    status: Status = "want_to_watch"
+
+
+class ItemUpdate(BaseModel):
+    status: Status
+
+
+class ItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tmdb_id: int
+    title: str
+    release_year: int | None = None
+    poster_path: str | None = None
+    overview: str | None = None
+    status: Status
+    added_by: uuid.UUID
+    watched_at: datetime | None = None
+    created_at: datetime

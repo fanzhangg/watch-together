@@ -7,8 +7,8 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M2 — lists + membership** (create/share lists with access control;
-movies/invites to come).
+Status: **M3 — movies** (TMDB search + add/track movies in a list; invites and
+UI to come).
 
 ## Repo layout
 
@@ -25,8 +25,12 @@ docs/       Design doc
 - **Python 3.11+** (3.13 used here)
 - **Node 20+** — for local frontend dev only. Install with
   `winget install OpenJS.NodeJS.LTS`, then reopen the terminal.
-- A **Neon** Postgres database (free tier) — optional until you need the DB;
-  the API's health check runs without one.
+- A **Neon** Postgres database (free tier) — optional for local dev, which
+  defaults to SQLite.
+- A **TMDB API key** (free) — only needed for *real* movie search. Get it from
+  <https://www.themoviedb.org/settings/api> and set `TMDB_API_KEY` in
+  `backend/.env`. Without it, the TMDB endpoints return a clear `503`; the rest
+  of the app works fine.
 
 ## Running the app locally
 

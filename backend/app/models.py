@@ -12,15 +12,39 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-__all__ = ["Base", "User", "List", "ListMember", "ROLE_OWNER", "ROLE_MEMBER"]
+__all__ = [
+    "Base",
+    "User",
+    "List",
+    "ListMember",
+    "ListItem",
+    "ROLE_OWNER",
+    "ROLE_MEMBER",
+    "STATUS_WANT",
+    "STATUS_WATCHED",
+    "STATUSES",
+]
 
 ROLE_OWNER = "owner"
 ROLE_MEMBER = "member"
+
+STATUS_WANT = "want_to_watch"
+STATUS_WATCHED = "watched"
+STATUSES = (STATUS_WANT, STATUS_WATCHED)
 
 
 class User(Base):
@@ -61,5 +85,41 @@ class ListMember(Base):
     )
     role: Mapped[str] = mapped_column(String, nullable=False, default=ROLE_MEMBER)
     joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ListItem(Base):
+    """A movie in a list, with a snapshot of its TMDB metadata.
+
+    The snapshot means rendering a list needs zero TMDB calls (and survives TMDB
+    outages); tmdb_id allows refreshing later. UNIQUE(list_id, tmdb_id) stops the
+    same film being added twice to one list.
+    """
+
+    __tablename__ = "list_items"
+    __table_args__ = (
+        UniqueConstraint("list_id", "tmdb_id", name="uq_list_items_list_tmdb"),
+        Index("ix_list_items_list_id", "list_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("lists.id", ondelete="CASCADE"), nullable=False
+    )
+    tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # --- TMDB snapshot ---
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    release_year: Mapped[int | None] = mapped_column(Integer)
+    poster_path: Mapped[str | None] = mapped_column(String)
+    overview: Mapped[str | None] = mapped_column(String)
+
+    status: Mapped[str] = mapped_column(String, nullable=False, default=STATUS_WANT)
+    added_by: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    watched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

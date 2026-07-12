@@ -3,11 +3,22 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import ROLE_MEMBER, ROLE_OWNER, List, ListMember, User
+from app.models import (
+    ROLE_MEMBER,
+    ROLE_OWNER,
+    STATUS_WATCHED,
+    List,
+    ListItem,
+    ListMember,
+    User,
+)
+from app.tmdb import Movie
 
 # Stable identity for the local dev-login user (DEV_LOGIN=1 only).
 DEV_USER_SUB = "dev-login-user"
@@ -122,4 +133,88 @@ def rename_list(db: Session, lst: List, name: str) -> List:
 
 def delete_list(db: Session, lst: List) -> None:
     db.delete(lst)
+    db.commit()
+
+
+# --- List items (movies) -------------------------------------------------
+def _mark_status(item: ListItem, status: str) -> None:
+    """Status is the source of truth; watched_at is derived from it."""
+    item.status = status
+    item.watched_at = datetime.now(timezone.utc) if status == STATUS_WATCHED else None
+
+
+def get_items(db: Session, list_id: uuid.UUID) -> list[ListItem]:
+    return list(
+        db.execute(
+            select(ListItem)
+            .where(ListItem.list_id == list_id)
+            .order_by(ListItem.created_at)
+        ).scalars()
+    )
+
+
+def get_item(db: Session, list_id: uuid.UUID, item_id: uuid.UUID) -> ListItem | None:
+    return db.execute(
+        select(ListItem).where(ListItem.id == item_id, ListItem.list_id == list_id)
+    ).scalar_one_or_none()
+
+
+def add_item(
+    db: Session,
+    *,
+    list_id: uuid.UUID,
+    added_by: User,
+    movie: Movie,
+    status: str,
+) -> tuple[ListItem, bool]:
+    """Add a movie to a list. Returns (item, created).
+
+    Adding a film already in the list is idempotent: the existing row is
+    returned rather than raising on UNIQUE(list_id, tmdb_id). The IntegrityError
+    path covers two members adding the same film concurrently.
+    """
+    existing = db.execute(
+        select(ListItem).where(
+            ListItem.list_id == list_id, ListItem.tmdb_id == movie.tmdb_id
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing, False
+
+    item = ListItem(
+        list_id=list_id,
+        tmdb_id=movie.tmdb_id,
+        title=movie.title,
+        release_year=movie.release_year,
+        poster_path=movie.poster_path,
+        overview=movie.overview,
+        added_by=added_by.id,
+    )
+    _mark_status(item, status)
+    db.add(item)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost a race with a concurrent add — fall back to the winner's row.
+        db.rollback()
+        existing = db.execute(
+            select(ListItem).where(
+                ListItem.list_id == list_id, ListItem.tmdb_id == movie.tmdb_id
+            )
+        ).scalar_one()
+        return existing, False
+
+    db.refresh(item)
+    return item, True
+
+
+def set_item_status(db: Session, item: ListItem, status: str) -> ListItem:
+    _mark_status(item, status)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_item(db: Session, item: ListItem) -> None:
+    db.delete(item)
     db.commit()
