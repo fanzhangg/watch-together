@@ -11,16 +11,20 @@ no key: https://image.tmdb.org/t/p/w200{poster_path}
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 import httpx
 
 BASE_URL = "https://api.themoviedb.org/3"
 TIMEOUT_SECONDS = 10.0
-# Connections to TMDB are occasionally reset mid-handshake on some networks.
-# httpx retries only connection-level failures here (never a completed request),
-# so this is safe for the non-idempotent-looking GETs too.
-CONNECT_RETRIES = 3
+
+# Some networks intermittently reset connections to api.themoviedb.org
+# (WinError 10054 / "connection reset"). These surface as httpx.TransportError
+# subclasses -- ReadError, ConnectError, etc. Every call here is a GET (a safe,
+# idempotent read), so retrying the whole request is correct.
+MAX_ATTEMPTS = 4
+BACKOFF_SECONDS = 0.3
 
 
 class TMDBError(RuntimeError):
@@ -60,20 +64,38 @@ def _to_movie(raw: dict) -> Movie:
     )
 
 
+def _fetch(url: str, params: dict) -> httpx.Response:
+    """One HTTP GET. Split out so the retry loop (and tests) can drive it."""
+    with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
+        return client.get(url, params=params)
+
+
 def _get(api_key: str, path: str, params: dict) -> dict:
     if not api_key:
         raise TMDBNotConfigured("TMDB_API_KEY is not set")
-    transport = httpx.HTTPTransport(retries=CONNECT_RETRIES)
-    try:
-        with httpx.Client(transport=transport, timeout=TIMEOUT_SECONDS) as client:
-            resp = client.get(
-                f"{BASE_URL}{path}", params={"api_key": api_key, **params}
-            )
-    except httpx.HTTPError as exc:  # network/timeout, after retries
-        raise TMDBError(f"TMDB request failed: {exc}") from exc
-    if resp.status_code != 200:
-        raise TMDBError(f"TMDB returned {resp.status_code}")
-    return resp.json()
+
+    url = f"{BASE_URL}{path}"
+    query = {"api_key": api_key, **params}
+    last_error = ""
+
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            resp = _fetch(url, query)
+        except httpx.TransportError as exc:
+            # Connection reset / timeout / DNS blip — retry.
+            last_error = f"TMDB request failed: {exc}"
+        else:
+            if resp.status_code == 200:
+                return resp.json()
+            if resp.status_code < 500:
+                # 401 bad key, 404 unknown movie — retrying won't help.
+                raise TMDBError(f"TMDB returned {resp.status_code}")
+            last_error = f"TMDB returned {resp.status_code}"
+
+        if attempt < MAX_ATTEMPTS - 1:
+            time.sleep(BACKOFF_SECONDS * (2**attempt))
+
+    raise TMDBError(f"{last_error} (after {MAX_ATTEMPTS} attempts)")
 
 
 def search_movies(api_key: str, query: str) -> list[Movie]:
