@@ -3,7 +3,8 @@ import DropdownMenu from "./DropdownMenu";
 import { formatWatchedDate, posterUrl, type Item } from "../types";
 
 /**
- * Poster, and — if watched — the day it was watched. That's all.
+ * Just the poster — and, once watched, the date stamped across it like a
+ * postmark.
  *
  * The title isn't rendered: the poster already carries it, far better than we
  * could. It moves to the link's aria-label so the card still has an accessible
@@ -43,9 +44,11 @@ export default function MovieCard({
             <span className="movie-title">{item.title}</span>
           </div>
         )}
+        {/* A watched movie gets the date stamped onto the poster, like a
+            postmark on a card you've received. */}
         {watched && item.watched_on && (
-          <div className="movie-body">
-            <div className="movie-watched">{formatWatchedDate(item.watched_on)}</div>
+          <div className="watch-stamp">
+            <span className="movie-watched">{formatWatchedDate(item.watched_on)}</span>
           </div>
         )}
       </Link>

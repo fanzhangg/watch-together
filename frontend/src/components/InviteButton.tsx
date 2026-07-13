@@ -54,7 +54,7 @@ export default function InviteButton({
   return (
     <>
       <button className="invite-btn" onClick={openDialog}>
-        🔗 Invite someone
+        🔗 Invite
       </button>
 
       {open && (

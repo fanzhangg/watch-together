@@ -261,7 +261,6 @@ input:focus-visible, button:focus-visible {
   margin: 2rem 0 0.9rem;
   font-size: 1.1rem;
 }
-.section-title .count { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
 
 .movie-grid {
   display: grid;
@@ -279,8 +278,8 @@ input:focus-visible, button:focus-visible {
   flex-direction: column;
   box-shadow: var(--shadow);
 }
-.movie.is-watched .poster { filter: grayscale(0.55); opacity: 0.75; }
 .movie-link {
+  position: relative; /* the watch stamp is pressed onto the poster */
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -360,9 +359,48 @@ input:focus-visible, button:focus-visible {
   color: var(--muted);
   font-size: 2rem;
 }
-.movie-body { padding: 0.5rem 0.6rem; }
 .movie-title { font-size: 0.92rem; font-weight: 550; line-height: 1.25; color: var(--text); }
-.movie-watched { color: var(--muted); font-size: 0.8rem; }
+
+/* The watch date as a rubber stamp: a double-ruled ring, struck at an angle,
+   in grey ink. The translucent plate behind it is what keeps the date legible
+   over dark poster art — grey ink alone vanishes on a dark still. */
+.watch-stamp {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  padding: 0.55rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  color: #6f6862;
+  background: rgb(245 243 240 / 0.72);
+  transform: rotate(-11deg);
+  opacity: 0.92;
+}
+/* The inner rule of the ring. */
+.watch-stamp::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.75;
+}
+.movie-watched {
+  font-size: 0.53rem;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .watch-stamp { color: #cfc7bf; background: rgb(20 18 15 / 0.6); }
+}
 
 /* --- movie detail page --- */
 .back-link {
@@ -508,7 +546,6 @@ input:focus-visible, button:focus-visible {
   padding: 0.2rem 0.6rem;
   font-size: 0.82rem;
 }
-.chip .role { color: var(--muted); font-size: 0.72rem; }
 
 /* --- misc --- */
 .center-card {
@@ -585,8 +622,10 @@ input:focus-visible, button:focus-visible {
   .more-btn { width: auto; min-width: 44px; }
 
   .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-  .movie-body { padding: 0.55rem 0.6rem 0.6rem; }
   .movie-title { font-size: 0.86rem; }
+  /* Narrower cards: shrink the stamp so it doesn't swallow the poster. */
+  .watch-stamp { width: 66px; height: 66px; padding: 0.45rem; }
+  .movie-watched { font-size: 0.47rem; }
   /* The card's "⋯" is a floating overlay, not a row button — keep it square at
      the app's 44px tap target rather than letting min-height stretch it. */
   .card-more-btn { min-height: 44px; height: 44px; width: 44px; }

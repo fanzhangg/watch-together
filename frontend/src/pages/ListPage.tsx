@@ -114,7 +114,6 @@ export default function ListPage() {
             {list?.members.map((m) => (
               <span className="chip" key={m.user.id}>
                 {m.user.display_name ?? m.user.email}
-                <span className="role">{m.role}</span>
               </span>
             ))}
           </div>
@@ -182,9 +181,7 @@ export default function ListPage() {
 
       {want.length > 0 && (
         <>
-          <h2 className="section-title">
-            Want to watch <span className="count">{want.length}</span>
-          </h2>
+          <h2 className="section-title">Want to watch</h2>
           <div className="movie-grid">
             {want.map((item) => (
               <MovieCard
@@ -201,9 +198,7 @@ export default function ListPage() {
 
       {watched.length > 0 && (
         <>
-          <h2 className="section-title">
-            Watched <span className="count">{watched.length}</span>
-          </h2>
+          <h2 className="section-title">Watched</h2>
           <div className="movie-grid">
             {watched.map((item) => (
               <MovieCard

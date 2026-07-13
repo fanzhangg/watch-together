@@ -82,7 +82,7 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
 
   // --- invite link (opens in a modal) ---
-  await page.getByRole("button", { name: /Invite someone/ }).click();
+  await page.getByRole("button", { name: /Invite/ }).click();
   const dialog = page.getByRole("dialog", { name: "Invite someone" });
   await expect(dialog).toBeVisible();
   const link = dialog.locator("input[readonly]");
@@ -280,7 +280,7 @@ test("invite page shows a preview and asks a signed-out visitor to sign in", asy
   await ownerPage.goto("/login");
   await ownerPage.getByRole("button", { name: "Dev login" }).click();
   await createAndOpenList(ownerPage, listName);
-  await ownerPage.getByRole("button", { name: /Invite someone/ }).click();
+  await ownerPage.getByRole("button", { name: /Invite/ }).click();
   const inviteDialog = ownerPage.getByRole("dialog", { name: "Invite someone" });
   const url = await inviteDialog.locator("input[readonly]").inputValue();
   await inviteDialog.getByRole("button", { name: "Done" }).click();
