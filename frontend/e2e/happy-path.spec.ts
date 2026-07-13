@@ -37,6 +37,16 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
 
   // --- mark watched, from the card's "⋯" menu (optimistic) ---
   await movie.getByRole("button", { name: "Options for The Matrix" }).click();
+
+  // The menu has to escape the card to be readable — the card used to clip it
+  // with `overflow: hidden` (which is also what rounds the poster's corners).
+  const menu = page.locator(".menu-popover");
+  const menuBox = (await menu.boundingBox())!;
+  const cardBox = (await movie.boundingBox())!;
+  expect(menuBox.width).toBeGreaterThan(cardBox.width);
+  expect(menuBox.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
 
   await expect(page.getByRole("heading", { name: /^Watched/ })).toBeVisible();

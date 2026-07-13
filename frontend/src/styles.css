@@ -275,19 +275,27 @@ input:focus-visible, button:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow);
 }
 .movie.is-watched .poster { filter: grayscale(0.55); opacity: 0.75; }
+/* The clipping that rounds the poster's corners lives HERE, not on .movie —
+   `overflow: hidden` on the card would also cut off the "⋯" menu, which has to
+   escape the card's bounds to be readable. */
 .movie-link {
   display: flex;
   flex-direction: column;
   flex: 1;
+  border-radius: inherit;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
 }
+/* An open menu must paint over neighbouring cards — each one is its own
+   stacking context (they transform on hover), so without this the popover
+   slides underneath the card to its right. */
+.movie:has(.menu-popover) { z-index: 30; }
 @media (hover: hover) {
   .movie:hover { transform: translateY(-2px); }
   .movie:hover .movie-title { color: var(--accent); }
