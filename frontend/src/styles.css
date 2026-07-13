@@ -302,8 +302,32 @@ input:focus-visible, button:focus-visible {
 }
 .movie { transition: transform 0.12s ease; }
 
-/* Sits over the poster's top-right corner, out of the title's way. */
-.movie .menu-anchor { position: absolute; top: 0.4rem; right: 0.4rem; z-index: 1; }
+/* Sits over the poster's top-right corner, out of the title's way.
+   The anchor is stretched across the card's full width (rather than wrapping
+   just the button) so that `max-width: 100%` on the popover below resolves
+   against the CARD. It's click-through, so it doesn't steal taps from the link
+   underneath — only the button and the menu itself take pointer events. */
+.movie .menu-anchor {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  left: 0.4rem;
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 1;
+}
+.movie .menu-anchor > * { pointer-events: auto; }
+
+/* The shared popover has a 240px min-width, sized for the header menus. Hanging
+   that off a ~160px poster pushes its left edge past the left edge of the SCREEN
+   for any card in the first column — and leftward overflow is unreachable (it
+   makes no scrollbar), so those items were simply gone. Bound the card menu to
+   the card it belongs to, which can never itself be off-screen. */
+.movie .menu-popover { min-width: 0; width: max-content; max-width: 100%; }
+/* Bounded to the card, the labels have ~140px to live in — trim the horizontal
+   padding so they fit on one line rather than wrapping. Below ~360px they still
+   wrap, which is fine: readable beats clipped. */
+.movie .menu-item { padding-left: 0.6rem; padding-right: 0.6rem; font-size: 0.88rem; }
 .card-more-btn {
   display: grid;
   place-items: center;

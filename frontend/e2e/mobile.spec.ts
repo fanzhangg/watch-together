@@ -61,6 +61,15 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
   expect(moreBox.width).toBeGreaterThanOrEqual(44);
 
   await more.tap();
+
+  // This card is in the LEFT column, where the menu — right-aligned to a narrow
+  // poster — used to hang off the left edge of the screen. Leftward overflow
+  // creates no scrollbar, so the items were unreachable, not just ugly.
+  const menuBox = (await page.locator(".menu-popover").boundingBox())!;
+  expect(menuBox.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
+  await expect(page.getByRole("menuitem", { name: "Remove from list" })).toBeVisible();
+
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).tap();
   await expect(
     page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),

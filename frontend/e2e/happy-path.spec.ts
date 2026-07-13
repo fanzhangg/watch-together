@@ -38,14 +38,16 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   // --- mark watched, from the card's "⋯" menu (optimistic) ---
   await movie.getByRole("button", { name: "Options for The Matrix" }).click();
 
-  // The menu has to escape the card to be readable — the card used to clip it
-  // with `overflow: hidden` (which is also what rounds the poster's corners).
-  const menu = page.locator(".menu-popover");
-  const menuBox = (await menu.boundingBox())!;
+  // The menu must be fully on screen. It is right-aligned to a ~160px poster, so
+  // anything wider than the card hangs off the LEFT edge of the screen for a
+  // first-column card — and leftward overflow makes no scrollbar, so those items
+  // are simply unreachable. Bounding it to the card is what prevents that.
+  const menuBox = (await page.locator(".menu-popover").boundingBox())!;
   const cardBox = (await movie.boundingBox())!;
-  expect(menuBox.width).toBeGreaterThan(cardBox.width);
+  expect(menuBox.width).toBeLessThanOrEqual(cardBox.width);
   expect(menuBox.x).toBeGreaterThanOrEqual(0);
   expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(page.getByRole("menuitem", { name: "Remove from list" })).toBeVisible();
 
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
 
