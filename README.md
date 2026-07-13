@@ -7,8 +7,10 @@ them watched / want-to-watch together.
 **Stack:** React + Vite · FastAPI + SQLAlchemy 2.0 (sync) + Alembic · Postgres
 (Neon) · deployed on Render. Full design in [docs/design.md](docs/design.md).
 
-Status: **M6 — ready to deploy** (all features built and tested; see
-[Deploy](#deploy-render--neon)).
+**Live:** <https://watch-together-4iso.onrender.com> (Render `oregon` + Neon
+`us-west-2`). Sign-in is Google-only in production.
+
+Status: **shipped** — M0–M6 complete. 43 backend tests + 5 Playwright e2e.
 
 ## Repo layout
 
