@@ -11,7 +11,11 @@ interface LocationState {
 
 export default function LoginPage() {
   const { data: user, isPending: userPending } = useMe();
-  const { data: config, isPending: configPending } = useConfig();
+  const {
+    data: config,
+    isPending: configPending,
+    error: configError,
+  } = useConfig();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -72,7 +76,20 @@ export default function LoginPage() {
           </>
         )}
 
-        {!showGoogle && !showDevLogin && (
+        {/* A failed /api/config request leaves `config` undefined, which looks
+            exactly like "this deployment offers no sign-in". Say which it is:
+            in dev the answer is almost always that the backend isn't running,
+            and blaming GOOGLE_CLIENT_ID sends you off to fix the wrong thing. */}
+        {configError && (
+          <div className="error">
+            Can’t reach the server.
+            {import.meta.env.DEV
+              ? " Is the backend running on port 8000? (cd backend && uvicorn app.main:app --reload --port 8000)"
+              : " Please try again in a moment."}
+          </div>
+        )}
+
+        {!configError && !showGoogle && !showDevLogin && (
           <div className="error">
             No sign-in method is configured. Set <code>GOOGLE_CLIENT_ID</code> on
             the server.
