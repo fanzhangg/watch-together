@@ -8,7 +8,7 @@ import InviteButton from "../components/InviteButton";
 import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
-import type { Item, ListDetail, Status } from "../types";
+import { todayISO, type Item, type ListDetail, type Status } from "../types";
 
 export default function ListPage() {
   const { id = "" } = useParams();
@@ -30,14 +30,19 @@ export default function ListPage() {
   });
 
   // Optimistic toggle: flip it in the cache immediately, roll back on failure.
+  // watched_on moves with the status — the card renders the date, so leaving it
+  // for the refetch would flash a dateless "Watched" card.
   const toggle = useMutation({
     mutationFn: ({ item, status }: { item: Item; status: Status }) =>
-      api.setItemStatus(id, item.id, status),
+      status === "watched"
+        ? api.markWatched(id, item.id)
+        : api.markUnwatched(id, item.id),
     onMutate: async ({ item, status }) => {
       await qc.cancelQueries({ queryKey: itemsKey });
       const previous = qc.getQueryData<Item[]>(itemsKey);
+      const watched_on = status === "watched" ? todayISO() : null;
       qc.setQueryData<Item[]>(itemsKey, (old) =>
-        old?.map((i) => (i.id === item.id ? { ...i, status } : i)),
+        old?.map((i) => (i.id === item.id ? { ...i, status, watched_on } : i)),
       );
       return { previous };
     },
@@ -92,7 +97,12 @@ export default function ListPage() {
   }
 
   const want = items?.filter((i) => i.status === "want_to_watch") ?? [];
-  const watched = items?.filter((i) => i.status === "watched") ?? [];
+  // Most recently watched first; within a day, most recently added first.
+  const watched = (items?.filter((i) => i.status === "watched") ?? []).sort(
+    (a, b) =>
+      (b.watched_on ?? "").localeCompare(a.watched_on ?? "") ||
+      b.created_at.localeCompare(a.created_at),
+  );
   const existingTmdbIds = new Set((items ?? []).map((i) => i.tmdb_id));
 
   return (
@@ -180,6 +190,7 @@ export default function ListPage() {
               <MovieCard
                 key={item.id}
                 item={item}
+                listId={id}
                 onToggle={() => toggle.mutate({ item, status: "watched" })}
                 onRemove={() => remove.mutate(item)}
               />
@@ -198,6 +209,7 @@ export default function ListPage() {
               <MovieCard
                 key={item.id}
                 item={item}
+                listId={id}
                 onToggle={() => toggle.mutate({ item, status: "want_to_watch" })}
                 onRemove={() => remove.mutate(item)}
               />

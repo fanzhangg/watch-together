@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     ROLE_MEMBER,
     ROLE_OWNER,
+    STATUS_WANT,
     STATUS_WATCHED,
     Invite,
     List,
@@ -139,10 +140,21 @@ def delete_list(db: Session, lst: List) -> None:
 
 
 # --- List items (movies) -------------------------------------------------
-def _mark_status(item: ListItem, status: str) -> None:
-    """Status is the source of truth; watched_at is derived from it."""
+class ItemUpdateError(ValueError):
+    """An update that would leave the row incoherent. Routes map this to a 422."""
+
+
+def _server_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+def _mark_status(item: ListItem, status: str, watched_on: date | None = None) -> None:
+    """Keep status and watched_on in lockstep (the DB CHECK requires it)."""
     item.status = status
-    item.watched_at = datetime.now(timezone.utc) if status == STATUS_WATCHED else None
+    if status == STATUS_WATCHED:
+        item.watched_on = watched_on or _server_today()
+    else:
+        item.watched_on = None
 
 
 def get_items(db: Session, list_id: uuid.UUID) -> list[ListItem]:
@@ -288,8 +300,37 @@ def accept_invite(db: Session, invite: Invite, user: User) -> ListMember:
     return membership
 
 
-def set_item_status(db: Session, item: ListItem, status: str) -> ListItem:
-    _mark_status(item, status)
+def update_item(
+    db: Session,
+    item: ListItem,
+    *,
+    status: str | None,
+    watched_on: date | None,
+    sets_watched_on: bool,
+) -> ListItem:
+    """Apply a PATCH to an item. See the semantics table in docs/design.md §5.
+
+    `sets_watched_on` says whether the caller sent the field at all, which is the
+    only way to tell "leave the date alone" from "blank the date".
+    """
+    target_status = status or item.status
+
+    if target_status == STATUS_WANT:
+        if sets_watched_on and watched_on is not None:
+            # Only reachable when status was omitted; the schema catches the
+            # explicit want_to_watch + date combination.
+            raise ItemUpdateError("an unwatched movie cannot have a watch date")
+        _mark_status(item, STATUS_WANT)
+    elif sets_watched_on:
+        if watched_on is None:
+            raise ItemUpdateError(
+                "a watched movie must have a watch date — unwatch it instead"
+            )
+        _mark_status(item, STATUS_WATCHED, watched_on)
+    else:
+        # No date given: keep the one it has, or stamp today if it's newly watched.
+        _mark_status(item, STATUS_WATCHED, item.watched_on)
+
     db.commit()
     db.refresh(item)
     return item

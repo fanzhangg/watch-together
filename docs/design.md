@@ -108,9 +108,10 @@ list_items                          -- a movie in a list (with TMDB snapshot)
   overview      text
   status        text   -- 'want_to_watch' | 'watched'
   added_by      uuid -> users.id
-  watched_at    timestamptz null
+  watched_on    date null           -- M7: the day it was watched, user-owned
   created_at    timestamptz
   UNIQUE (list_id, tmdb_id)         -- prevent dupes in a list
+  CHECK ((status = 'watched') = (watched_on IS NOT NULL))
 
 invites
   id            uuid pk
@@ -124,10 +125,16 @@ invites
 ### Indexes (up front)
 - `list_members(user_id)` — "my lists" lookup
 - `list_items(list_id)` — board loads
+- `list_items(list_id, watched_on)` — chronological watched ordering (M7)
 - `UNIQUE(list_id, tmdb_id)` and `invites.code` uniques cover the rest
 
 ### Notes
 - TMDB fields are **snapshotted** into `list_items`; rendering needs no TMDB call.
+- **`watched_on` is a `DATE`, not a timestamp** (M7). "We watched it on the 12th"
+  is the same fact in every timezone; a timestamp forces every reader to pick one
+  and gets the day wrong for evening viewings. The **CHECK constraint makes
+  "watched" and "has a date" the same thing** — there is no watched-but-undated
+  state to branch on anywhere in the code.
 - Invite is **multi-use until expiry** (simplest); a `used_at` column can make it
   single-use later.
 - Access control is one rule: for any `/api/lists/{id}/*` route, require a row in
@@ -151,9 +158,30 @@ invites
 
 ### Items
 - `GET  /api/lists/{id}/items`
+- `GET  /api/lists/{id}/items/{itemId}` — one item (the detail page's own load, M7)
 - `POST /api/lists/{id}/items` — body: `{ tmdb_id, status }` → backend fetches TMDB metadata, inserts snapshot
-- `PATCH /api/lists/{id}/items/{itemId}` — change `status` (sets/clears `watched_at`)
+- `PATCH /api/lists/{id}/items/{itemId}` — body: `{ status?, watched_on? }` (M7)
 - `DELETE /api/lists/{id}/items/{itemId}`
+
+#### PATCH item semantics (M7)
+Both fields are optional, but the request must contain at least one, and it must
+leave the row consistent with the CHECK constraint. Contradictions are **422s,
+not silent fixes** — they can only come from a client bug.
+
+| Body | Result |
+|------|--------|
+| `{status: "watched", watched_on: "2026-07-12"}` | watched on that day (what the UI sends) |
+| `{status: "watched"}` | watched; date defaults to the **server's** UTC today |
+| `{watched_on: "2026-07-01"}` on a watched item | moves the date |
+| `{status: "want_to_watch"}` | unwatched; `watched_on` cleared |
+| `{status: "want_to_watch", watched_on: <date>}` | **422** — contradictory |
+| `{watched_on: <date>}` on an unwatched item | **422** — would break the invariant |
+| `{watched_on: null}` on a watched item | **422** — unwatch it instead |
+| any `watched_on` more than 1 day in the future | **422** — you can't have watched it yet |
+
+The **client sends its own local today** when marking watched, so the server
+never has to guess the user's timezone. The +1 day tolerance on the future check
+exists precisely to absorb the gap between the client's today and the server's.
 
 ### Invites
 - `POST /api/lists/{id}/invites` — create → returns `{ code, url }`
@@ -162,6 +190,10 @@ invites
 
 ### TMDB proxy
 - `GET /api/tmdb/search?q=...` — returns trimmed results (id, title, year, poster_path)
+- `GET /api/tmdb/movie/{tmdbId}` — full metadata for the detail page (M7): runtime,
+  genres, tagline, rating, backdrop, director, top cast. **Fetched live, not
+  snapshotted** — the board still renders from the DB snapshot with zero TMDB
+  calls, so a TMDB outage degrades one page instead of the whole app.
 
 ### Access-control dependency (the query that matters)
 ```python
@@ -199,13 +231,26 @@ key are configured. Never enabled in production.
 ## 7. Frontend (React + Vite)
 
 - **Routes**: `/login`, `/` (my lists), `/lists/:id` (movie board),
-  `/invite/:code` (accept).
+  `/lists/:id/items/:itemId` (movie detail, M7), `/invite/:code` (accept).
 - **Server state**: TanStack Query — caching + optimistic updates on status toggle.
 - **Key components**: `ListBoard` (items grouped by status),
   `MovieSearchDialog` (debounced TMDB search → add), `InviteButton`
   (create + copy link), `MemberList`.
 - **Posters**: build TMDB image URL from `poster_path` on the client
   (`https://image.tmdb.org/t/p/w200{poster_path}`) — public, no key needed.
+
+### Cards vs. the detail page (M7)
+The card is **deliberately minimal** — poster, title, and (if watched) the watch
+date. Nothing else. The card body is a link to the detail page; the quick actions
+(mark watched / unwatch / remove) live behind a `⋯` menu on the card, reusing the
+same `DropdownMenu` as the list header. Everything richer — full TMDB metadata,
+changing the watch date — is on the detail page.
+
+**Dates must never be parsed with `new Date("2026-07-12")`.** That parses as UTC
+midnight, so `toLocaleDateString()` renders it as the *11th* anywhere west of
+Greenwich — the exact off-by-one-day bug we moved to a `DATE` column to avoid.
+All conversion goes through the helpers in `types.ts` (`parseLocalDate`,
+`todayISO`, `formatWatchedDate`); nothing else touches the raw string.
 
 ---
 
@@ -248,6 +293,20 @@ key are configured. Never enabled in production.
   dialog, invite/copy button, member list, empty states, mobile layout.
 - **M6 — Ship.** Real Google OAuth client + TMDB key in Render env, migrations on
   deploy, warm instance, first `pg_dump`. *Done when:* both users are on the real URL.
+- **M7 — Watch dates & movie detail.** `watched_at timestamptz` → `watched_on date`
+  (+ CHECK, + backfill of existing rows); PATCH accepts a date; watched section
+  sorted newest-first; minimal cards with a `⋯` menu; a movie detail page with
+  live TMDB metadata where the date is edited. *Done when:* you can mark a movie
+  watched, open it, correct the date to the day you actually watched it, and see
+  the watched list reorder.
+
+### Out of scope for M7 (deliberately)
+- **Calendar view.** Cut for implementation simplicity. The `DATE` column and the
+  newest-first ordering are exactly what it would need, so it stays cheap to add.
+- **Rewatches.** One watch date per movie. When this chafes it becomes a
+  `watch_events` table — a real migration, not a tweak.
+- **Backfilling old films you never added** (add → mark watched → fix date is the
+  3-step path). Expect this to come back as a request.
 
 ---
 
@@ -265,6 +324,8 @@ Almost all risk is in the *integration seams*, not the (thin) business logic.
 | 6 | **Concurrent add of same movie** — `UNIQUE(list_id, tmdb_id)` throws `IntegrityError`. | Low | Catch it, treat as idempotent (return existing item), not a 500. |
 | 7 | **Migration fails on deploy** → app won't boot. | Low | Alembic as a pre-deploy step; test `upgrade head` on a fresh DB before shipping. |
 | 8 | **Scope creep** (the "SaaS for two" over-build) — the biggest *schedule* risk. | Medium | Milestones are vertical slices; ship M1–M4 usable before M5 polish. |
+| 9 | **(M7) `new Date("2026-07-12")` parses as UTC midnight** → `toLocaleDateString()` renders the *previous day* in any US timezone. Would put a wrong date on every card. | High | One `parseLocalDate` helper in `types.ts`; nothing else touches the raw date string. Asserted in the e2e (the card must show *today*). |
+| 10 | **(M7) The data migration is the one thing the test suite can't see** — tests build the schema with `create_all`, not Alembic, so the `timestamptz → date` backfill SQL first runs against *production data*. The cast is lossy and irreversible: a wrong timezone silently shifts real watch dates back a day. | High | `pg_dump` **before** the deploy; run `alembic upgrade head` against the docker-compose Postgres with seeded watched rows first. Cast at `America/Los_Angeles`, not UTC (9pm PDT is stored as 04:00 UTC *the next day*). |
 
 Risks **1, 2, and 3** are the ones that eat an afternoon if found late — all three are cheap to prove out in M0/M1.
 
@@ -301,3 +362,4 @@ covers the only real logic (access control), the only stateful transition
 | **M4 Invites** | Creating returns code+URL; preview shows list name; accepting adds caller to `list_members`; **logged-out** accept rejected. | Integration: A creates invite → B accepts → B passes the M2 membership check. One Playwright pass with a second account. |
 | **M5 Frontend polish** | Board groups by status; status toggle is optimistic and reconciles; search→add works; invite link copies; usable on mobile. | **Playwright** e2e: dev-login → create list → search+add → toggle watched → open invite. Manual `/verify` for layout/empty states. |
 | **M6 Ship** | Prod URL loads; real Google login works E2E; TMDB search works with the prod key; first `pg_dump` is restorable. | Manual prod smoke of the full happy path (both users) + confirm the backup restores into a scratch Neon branch. |
+| **M7 Watch dates** | Marking watched stores **today** and shows it on the card; the date is editable on the detail page; watched sorts newest-first; a watched row can never have a null date (CHECK); contradictory/future dates are 422s; existing watched rows keep the right day through the migration. | Integration: PATCH matrix from §5 (each 422 case asserted); the CHECK rejects an inconsistent row. **Playwright**: mark watched → card shows today's date (guards risk #9) → detail page → change the date → list reorders. Migration: `alembic upgrade head` on seeded Postgres, assert an evening-UTC timestamp lands on the *previous* local day (risk #10). |

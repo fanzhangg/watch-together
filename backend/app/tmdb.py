@@ -12,7 +12,7 @@ no key: https://image.tmdb.org/t/p/w200{poster_path}
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -47,6 +47,25 @@ class Movie:
     release_year: int | None
     poster_path: str | None
     overview: str | None
+
+
+@dataclass
+class MovieDetail(Movie):
+    """Everything the detail page shows. Fetched live and never stored — the
+    board renders from the DB snapshot, so a TMDB outage costs one page, not the
+    app."""
+
+    backdrop_path: str | None = None
+    tagline: str | None = None
+    runtime: int | None = None
+    genres: list[str] = field(default_factory=list)
+    vote_average: float | None = None
+    director: str | None = None
+    cast: list[str] = field(default_factory=list)
+
+
+# The detail page shows a handful of names, not a full unit list.
+TOP_CAST = 8
 
 
 def _release_year(release_date: str | None) -> int | None:
@@ -119,3 +138,46 @@ def search_movies(api_key: str, query: str) -> list[Movie]:
 def get_movie(api_key: str, tmdb_id: int) -> Movie:
     """Fetch one movie's metadata — used to snapshot it when adding to a list."""
     return _to_movie(_get(api_key, f"/movie/{tmdb_id}", {"language": "en-US"}))
+
+
+def get_movie_detail(api_key: str, tmdb_id: int) -> MovieDetail:
+    """Fetch the full metadata the detail page renders.
+
+    `append_to_response=credits` folds the cast/crew into the same request, so
+    the page costs one TMDB call rather than two.
+    """
+    raw = _get(
+        api_key,
+        f"/movie/{tmdb_id}",
+        {"language": "en-US", "append_to_response": "credits"},
+    )
+    credits = raw.get("credits") or {}
+    director = next(
+        (
+            person["name"]
+            for person in credits.get("crew", [])
+            if person.get("job") == "Director"
+        ),
+        None,
+    )
+    base = _to_movie(raw)
+
+    return MovieDetail(
+        tmdb_id=base.tmdb_id,
+        title=base.title,
+        release_year=base.release_year,
+        poster_path=base.poster_path,
+        overview=base.overview,
+        backdrop_path=raw.get("backdrop_path"),
+        tagline=raw.get("tagline") or None,
+        # TMDB sends 0 for "unknown runtime" — that's a null, not a 0-minute film.
+        runtime=raw.get("runtime") or None,
+        genres=[g["name"] for g in raw.get("genres", []) if g.get("name")],
+        vote_average=raw.get("vote_average") or None,
+        director=director,
+        cast=[
+            person["name"]
+            for person in credits.get("cast", [])[:TOP_CAST]
+            if person.get("name")
+        ],
+    )

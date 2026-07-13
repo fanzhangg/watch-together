@@ -53,10 +53,15 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
   const movie = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
   await expect(movie).toBeVisible();
 
-  // Movie action buttons are tappable (>=40px tall).
-  const watchedBtn = movie.getByRole("button", { name: "✓ Watched" });
-  expect((await watchedBtn.boundingBox())!.height).toBeGreaterThanOrEqual(40);
-  await watchedBtn.tap();
+  // The card's "⋯" overlays the poster, so it doesn't get the row buttons' sizing
+  // for free — assert it's still a comfortable tap target.
+  const more = movie.getByRole("button", { name: "Options for The Matrix" });
+  const moreBox = (await more.boundingBox())!;
+  expect(moreBox.height).toBeGreaterThanOrEqual(44);
+  expect(moreBox.width).toBeGreaterThanOrEqual(44);
+
+  await more.tap();
+  await page.getByRole("menuitem", { name: "✓ Mark watched" }).tap();
   await expect(
     page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),
   ).toBeVisible();

@@ -5,6 +5,7 @@ import InvitePage from "./pages/InvitePage";
 import ListPage from "./pages/ListPage";
 import ListsPage from "./pages/ListsPage";
 import LoginPage from "./pages/LoginPage";
+import MovieDetailPage from "./pages/MovieDetailPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { data: user, isPending } = useMe();
@@ -31,6 +32,7 @@ export default function App() {
       >
         <Route path="/" element={<ListsPage />} />
         <Route path="/lists/:id" element={<ListPage />} />
+        <Route path="/lists/:id/items/:itemId" element={<MovieDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

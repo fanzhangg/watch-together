@@ -1,19 +1,22 @@
-"""M3 tests: TMDB search proxy + movie item lifecycle.
+"""M3/M7 tests: TMDB proxy + movie item lifecycle + the watch date.
 
 TMDB is mocked throughout — no network and no API key needed. Covers the
-stateful bit that actually has logic (status <-> watched_at) and the duplicate
+stateful bit that actually has logic (status <-> watched_on) and the duplicate
 add being idempotent rather than a 500.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import ListItem, User
 from app.tmdb import Movie, TMDBError, TMDBNotFound
 
 MATRIX = Movie(
@@ -77,16 +80,34 @@ def test_add_item_snapshots_metadata(
     assert body["title"] == "The Matrix"
     assert body["release_year"] == 1999
     assert body["status"] == "want_to_watch"
-    assert body["watched_at"] is None
+    assert body["watched_on"] is None
     assert body["added_by"] == str(alice.id)
 
     listed = ca.get(f"/api/lists/{lid}/items").json()
     assert [i["tmdb_id"] for i in listed] == [603]
 
 
-def test_status_toggle_sets_and_clears_watched_at(
+def test_get_single_item(
     client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
 ) -> None:
+    """The detail page deep-links, so it must load without the list in cache."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+
+    got = ca.get(f"/api/lists/{lid}/items/{iid}")
+    assert got.status_code == 200
+    assert got.json()["title"] == "The Matrix"
+
+    assert ca.get(f"/api/lists/{lid}/items/{uuid.uuid4()}").status_code == 404
+
+
+# --- M7: the watch date ---------------------------------------------------
+def test_status_toggle_sets_and_clears_watched_on(
+    client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
+) -> None:
+    """Marking watched without a date stamps the server's today; unwatching
+    clears it. status and watched_on are never out of step."""
     ca = client_factory(alice)
     lid = _new_list(ca)
     iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
@@ -94,14 +115,133 @@ def test_status_toggle_sets_and_clears_watched_at(
     watched = ca.patch(f"/api/lists/{lid}/items/{iid}", json={"status": "watched"})
     assert watched.status_code == 200
     assert watched.json()["status"] == "watched"
-    assert watched.json()["watched_at"] is not None
+    assert watched.json()["watched_on"] == date.today().isoformat()
 
-    # Toggling back clears watched_at.
     unwatched = ca.patch(
         f"/api/lists/{lid}/items/{iid}", json={"status": "want_to_watch"}
     )
     assert unwatched.json()["status"] == "want_to_watch"
-    assert unwatched.json()["watched_at"] is None
+    assert unwatched.json()["watched_on"] is None
+
+
+def test_mark_watched_on_a_given_day(
+    client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
+) -> None:
+    """What the UI actually sends: the user's own local today (or any past day)."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+
+    resp = ca.patch(
+        f"/api/lists/{lid}/items/{iid}",
+        json={"status": "watched", "watched_on": "2026-07-04"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["watched_on"] == "2026-07-04"
+
+    # And the date can be moved afterwards, without re-sending the status.
+    moved = ca.patch(f"/api/lists/{lid}/items/{iid}", json={"watched_on": "2026-06-01"})
+    assert moved.status_code == 200
+    assert moved.json()["watched_on"] == "2026-06-01"
+    assert moved.json()["status"] == "watched"
+
+
+def test_unwatching_forgets_the_date(
+    client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
+) -> None:
+    """Re-watching does not silently resurrect the old date — it's today again."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+    url = f"/api/lists/{lid}/items/{iid}"
+
+    ca.patch(url, json={"status": "watched", "watched_on": "2026-01-01"})
+    ca.patch(url, json={"status": "want_to_watch"})
+    again = ca.patch(url, json={"status": "watched"})
+
+    assert again.json()["watched_on"] == date.today().isoformat()
+
+
+def test_tomorrow_is_allowed_but_next_week_is_not(
+    client_factory: Callable[..., TestClient], alice: User, mock_tmdb: None
+) -> None:
+    """The client sends its LOCAL today, which can legitimately be a day ahead of
+    the server's UTC today. Tolerate exactly that — you can't have watched a film
+    next week."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+    url = f"/api/lists/{lid}/items/{iid}"
+    today = date.today()
+
+    ahead = ca.patch(
+        url,
+        json={
+            "status": "watched",
+            "watched_on": (today + timedelta(days=1)).isoformat(),
+        },
+    )
+    assert ahead.status_code == 200
+
+    far = ca.patch(
+        url,
+        json={
+            "status": "watched",
+            "watched_on": (today + timedelta(days=7)).isoformat(),
+        },
+    )
+    assert far.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("body", "start_watched"),
+    [
+        # A date on a movie that isn't watched — would break the CHECK.
+        ({"watched_on": "2026-07-04"}, False),
+        ({"status": "want_to_watch", "watched_on": "2026-07-04"}, True),
+        # Blanking the date of a watched movie — unwatch it instead.
+        ({"watched_on": None}, True),
+        # Nothing to do.
+        ({}, False),
+    ],
+)
+def test_incoherent_updates_are_rejected(
+    client_factory: Callable[..., TestClient],
+    alice: User,
+    mock_tmdb: None,
+    body: dict,
+    start_watched: bool,
+) -> None:
+    """Contradictions are 422s, not silent repairs — they can only be client bugs."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+    url = f"/api/lists/{lid}/items/{iid}"
+    if start_watched:
+        ca.patch(url, json={"status": "watched", "watched_on": "2026-07-04"})
+
+    assert ca.patch(url, json=body).status_code == 422
+
+
+def test_watched_is_always_dated(
+    client_factory: Callable[..., TestClient],
+    alice: User,
+    mock_tmdb: None,
+    db_session: Session,
+) -> None:
+    """The DB itself refuses a watched-but-undated row, so no code path anywhere
+    has to handle one."""
+    ca = client_factory(alice)
+    lid = _new_list(ca)
+    iid = ca.post(f"/api/lists/{lid}/items", json={"tmdb_id": 603}).json()["id"]
+    ca.patch(f"/api/lists/{lid}/items/{iid}", json={"status": "watched"})
+
+    item = db_session.get(ListItem, uuid.UUID(iid))
+    assert item is not None
+    item.watched_on = None
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
 
 
 def test_duplicate_add_is_idempotent(

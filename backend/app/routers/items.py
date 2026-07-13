@@ -92,14 +92,41 @@ def add_item(
     return ItemOut.model_validate(item)
 
 
+@router.get(
+    "/{item_id}",
+    response_model=ItemOut,
+    summary="One movie in the list",
+    responses={
+        200: {"description": "The item"},
+        403: {"description": "Not a member of this list"},
+        404: {"description": "No such item in this list"},
+    },
+)
+def get_item(
+    item_id: uuid.UUID,
+    ctx: ListContext = Depends(require_list_member),
+    db: Session = Depends(get_db),
+) -> ItemOut:
+    """Lets the detail page load on its own — a deep link or a hard refresh has
+    no items list in the cache to read from."""
+    item = crud.get_item(db, ctx.list.id, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such item")
+    return ItemOut.model_validate(item)
+
+
 @router.patch(
     "/{item_id}",
     response_model=ItemOut,
-    summary="Change a movie's watched status",
+    summary="Change a movie's watched status and/or watch date",
     responses={
-        200: {"description": "Status updated; watched_at is set or cleared to match"},
+        200: {"description": "Updated; status and watched_on stay in lockstep"},
         403: {"description": "Not a member of this list"},
         404: {"description": "No such item in this list"},
+        422: {
+            "description": "Incoherent update — a date on an unwatched movie, a "
+            "null date on a watched one, or a date in the future"
+        },
     },
 )
 def update_item(
@@ -108,10 +135,25 @@ def update_item(
     ctx: ListContext = Depends(require_list_member),
     db: Session = Depends(get_db),
 ) -> ItemOut:
+    """Marking watched without a date stamps the server's today; the UI instead
+    sends the user's LOCAL today, so we never have to guess their timezone."""
     item = crud.get_item(db, ctx.list.id, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such item")
-    return ItemOut.model_validate(crud.set_item_status(db, item, payload.status))
+
+    try:
+        updated = crud.update_item(
+            db,
+            item,
+            status=payload.status,
+            watched_on=payload.watched_on,
+            sets_watched_on=payload.sets_watched_on,
+        )
+    except crud.ItemUpdateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    return ItemOut.model_validate(updated)
 
 
 @router.delete(

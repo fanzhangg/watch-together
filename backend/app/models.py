@@ -10,9 +10,11 @@ per docs/design.md.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
+    CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -125,6 +127,14 @@ class ListItem(Base):
     __table_args__ = (
         UniqueConstraint("list_id", "tmdb_id", name="uq_list_items_list_tmdb"),
         Index("ix_list_items_list_id", "list_id"),
+        # Chronological ordering of the watched section.
+        Index("ix_list_items_list_watched_on", "list_id", "watched_on"),
+        # "Watched" and "has a date" are the same fact — enforced here so no
+        # code path anywhere has to handle a watched-but-undated movie.
+        CheckConstraint(
+            "(status = 'watched') = (watched_on IS NOT NULL)",
+            name="ck_list_items_watched_on_matches_status",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -143,7 +153,10 @@ class ListItem(Base):
     added_by: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    watched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The DAY it was watched, not an instant: "we watched it on the 12th" is the
+    # same fact in every timezone, whereas a timestamp forces every reader to
+    # pick one and gets the day wrong for an evening viewing. Null iff not watched.
+    watched_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

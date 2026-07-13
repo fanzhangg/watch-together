@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class UserOut(BaseModel):
@@ -80,13 +80,71 @@ class MovieSearchResult(BaseModel):
     overview: str | None = None
 
 
+class MovieDetail(BaseModel):
+    """Full TMDB metadata for the movie detail page — fetched live, not stored."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tmdb_id: int
+    title: str
+    release_year: int | None = None
+    poster_path: str | None = None
+    backdrop_path: str | None = None
+    overview: str | None = None
+    tagline: str | None = None
+    runtime: int | None = None  # minutes
+    genres: list[str] = []
+    vote_average: float | None = None
+    director: str | None = None
+    cast: list[str] = []
+
+
 class ItemCreate(BaseModel):
     tmdb_id: int
     status: Status = "want_to_watch"
 
 
+# A client's "today" can legitimately be a day ahead of the server's (they send
+# their LOCAL date; the server thinks in UTC). Tolerate exactly that much and no
+# more — you cannot have watched a film next week.
+FUTURE_TOLERANCE_DAYS = 1
+
+
 class ItemUpdate(BaseModel):
-    status: Status
+    """Change a movie's watched status and/or the day it was watched.
+
+    Both fields are optional but at least one is required. Contradictions are
+    rejected rather than silently repaired — they can only come from a client
+    bug, and the DB CHECK would reject them anyway. `model_fields_set` is what
+    distinguishes "watched_on omitted" (leave it alone) from an explicit
+    `"watched_on": null` (blank it — which is never allowed while watched).
+    """
+
+    status: Status | None = None
+    watched_on: date | None = None
+
+    @field_validator("watched_on")
+    @classmethod
+    def _not_in_the_future(cls, value: date | None) -> date | None:
+        if value is None:
+            return value
+        limit = datetime.now(timezone.utc).date() + timedelta(days=FUTURE_TOLERANCE_DAYS)
+        if value > limit:
+            raise ValueError("watched_on cannot be in the future")
+        return value
+
+    @model_validator(mode="after")
+    def _coherent(self) -> ItemUpdate:
+        if not self.model_fields_set:
+            raise ValueError("provide status and/or watched_on")
+        if self.status == "want_to_watch" and self.watched_on is not None:
+            raise ValueError("an unwatched movie cannot have a watch date")
+        return self
+
+    @property
+    def sets_watched_on(self) -> bool:
+        """True when the caller sent the field at all — including as null."""
+        return "watched_on" in self.model_fields_set
 
 
 class ItemOut(BaseModel):
@@ -100,7 +158,8 @@ class ItemOut(BaseModel):
     overview: str | None = None
     status: Status
     added_by: uuid.UUID
-    watched_at: datetime | None = None
+    # Null iff status is want_to_watch — the DB CHECK guarantees it.
+    watched_on: date | None = None
     created_at: datetime
 
 

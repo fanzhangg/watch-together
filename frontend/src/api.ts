@@ -1,16 +1,17 @@
 // Typed API client. Requests go through the Vite dev proxy (same origin in dev,
 // same origin in prod too), so the session cookie is sent automatically.
 
-import type {
-  AppConfig,
-  Invite,
-  InvitePreview,
-  Item,
-  ListDetail,
-  ListSummary,
-  MovieSearchResult,
-  Status,
-  User,
+import {
+  todayISO,
+  type AppConfig,
+  type Invite,
+  type InvitePreview,
+  type Item,
+  type ListDetail,
+  type ListSummary,
+  type MovieDetail,
+  type MovieSearchResult,
+  type User,
 } from "./types";
 
 export class ApiError extends Error {
@@ -73,12 +74,26 @@ export const api = {
 
   // --- movies in a list ---
   getItems: (listId: string) => request<Item[]>(`/api/lists/${listId}/items`),
+  getItem: (listId: string, itemId: string) =>
+    request<Item>(`/api/lists/${listId}/items/${itemId}`),
   addItem: (listId: string, tmdbId: number) =>
     request<Item>(`/api/lists/${listId}/items`, post({ tmdb_id: tmdbId })),
-  setItemStatus: (listId: string, itemId: string, status: Status) =>
+  /** Mark watched. Sends the user's LOCAL today so the server never guesses. */
+  markWatched: (listId: string, itemId: string, watchedOn: string = todayISO()) =>
     request<Item>(`/api/lists/${listId}/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: "watched", watched_on: watchedOn }),
+    }),
+  markUnwatched: (listId: string, itemId: string) =>
+    request<Item>(`/api/lists/${listId}/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "want_to_watch" }),
+    }),
+  /** Move the watch date of an already-watched movie. */
+  setWatchedOn: (listId: string, itemId: string, watchedOn: string) =>
+    request<Item>(`/api/lists/${listId}/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ watched_on: watchedOn }),
     }),
   deleteItem: (listId: string, itemId: string) =>
     request<void>(`/api/lists/${listId}/items/${itemId}`, { method: "DELETE" }),
@@ -86,6 +101,8 @@ export const api = {
   // --- tmdb ---
   searchMovies: (q: string) =>
     request<MovieSearchResult[]>(`/api/tmdb/search?q=${encodeURIComponent(q)}`),
+  getMovieDetail: (tmdbId: number) =>
+    request<MovieDetail>(`/api/tmdb/movie/${tmdbId}`),
 
   // --- invites ---
   createInvite: (listId: string) =>

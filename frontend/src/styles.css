@@ -268,7 +268,10 @@ input:focus-visible, button:focus-visible {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 1.1rem;
 }
+/* The card is a link with a "⋯" menu floated on top — poster, title, and the
+   watch date, nothing else. Everything richer is on the detail page. */
 .movie {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -278,6 +281,39 @@ input:focus-visible, button:focus-visible {
   box-shadow: var(--shadow);
 }
 .movie.is-watched .poster { filter: grayscale(0.55); opacity: 0.75; }
+.movie-link {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .movie:hover { transform: translateY(-2px); }
+  .movie:hover .movie-title { color: var(--accent); }
+}
+.movie { transition: transform 0.12s ease; }
+
+/* Sits over the poster's top-right corner, out of the title's way. */
+.movie .menu-anchor { position: absolute; top: 0.4rem; right: 0.4rem; z-index: 1; }
+.card-more-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: #fff;
+  background: rgb(0 0 0 / 0.55);
+  border-color: transparent;
+  backdrop-filter: blur(4px);
+}
+@media (hover: hover) {
+  .card-more-btn:hover:not(:disabled) { background: rgb(0 0 0 / 0.75); }
+}
+
 .poster {
   aspect-ratio: 2 / 3;
   width: 100%;
@@ -291,11 +327,63 @@ input:focus-visible, button:focus-visible {
   color: var(--muted);
   font-size: 2rem;
 }
-.movie-body { padding: 0.65rem 0.7rem 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+.movie-body { padding: 0.65rem 0.7rem 0.7rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
 .movie-title { font-size: 0.92rem; font-weight: 550; line-height: 1.25; }
-.movie-year { color: var(--muted); font-size: 0.82rem; }
-.movie-actions { display: flex; gap: 0.35rem; margin-top: auto; }
-.movie-actions button { flex: 1; }
+.movie-watched { color: var(--muted); font-size: 0.8rem; }
+
+/* --- movie detail page --- */
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.25rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+@media (hover: hover) {
+  .back-link:hover { color: var(--text); }
+}
+.detail { display: grid; grid-template-columns: 260px 1fr; gap: 2rem; align-items: start; }
+.detail-poster {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--surface-2);
+}
+.detail-body { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.detail-body h1 { font-size: 1.9rem; line-height: 1.15; }
+.detail-meta { display: flex; gap: 1rem; color: var(--muted); font-size: 0.9rem; }
+.detail-tagline { color: var(--muted); font-style: italic; }
+.detail-overview { line-height: 1.6; max-width: 65ch; }
+.detail-credit { font-size: 0.92rem; }
+.detail-credit .muted { margin-right: 0.5rem; }
+.detail-remove { align-self: start; margin-top: 0.5rem; }
+
+/* The reason the page exists: the watch date, and the controls that change it. */
+.watch-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.watch-panel.is-watched { border-color: var(--accent); }
+.watch-panel-title { font-weight: 550; }
+.watch-date { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; font-size: 0.85rem; }
+.watch-date input[type="date"] {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  color-scheme: light dark;
+}
 
 /* --- empty state --- */
 .empty {
@@ -467,8 +555,16 @@ input:focus-visible, button:focus-visible {
   .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .movie-body { padding: 0.55rem 0.6rem 0.6rem; }
   .movie-title { font-size: 0.86rem; }
-  .movie-actions button { min-height: 40px; }
-  .movie-actions button.ghost { width: 40px; flex: none; }
+  /* The card's "⋯" is a floating overlay, not a row button — keep it square at
+     the app's 44px tap target rather than letting min-height stretch it. */
+  .card-more-btn { min-height: 44px; height: 44px; width: 44px; }
+
+  /* One column: a poster beside a full metadata column doesn't fit a phone. */
+  .detail { grid-template-columns: 1fr; gap: 1.25rem; }
+  .detail-poster { max-width: 200px; }
+  .detail-body h1 { font-size: 1.45rem; }
+  .watch-panel { align-items: stretch; }
+  .watch-panel button { width: 100%; }
 
   .card-grid { grid-template-columns: 1fr; }
 
@@ -496,6 +592,5 @@ input:focus-visible, button:focus-visible {
 }
 
 @media (max-width: 380px) {
-  .movie-actions { flex-direction: column; }
-  .movie-actions button.ghost { width: 100%; }
+  .watch-date { flex-direction: column; align-items: stretch; }
 }

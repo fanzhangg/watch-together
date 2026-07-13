@@ -35,18 +35,32 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   const movie = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
   await expect(movie).toBeVisible();
 
-  // --- mark watched (optimistic) -> moves to the Watched section ---
-  await movie.getByRole("button", { name: "✓ Watched" }).click();
+  // --- mark watched, from the card's "⋯" menu (optimistic) ---
+  await movie.getByRole("button", { name: "Options for The Matrix" }).click();
+  await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
+
   await expect(page.getByRole("heading", { name: /^Watched/ })).toBeVisible();
-  await expect(
-    page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),
-  ).toBeVisible();
+  const watchedCard = page.locator(".movie.is-watched").filter({ hasText: "The Matrix" });
+  await expect(watchedCard).toBeVisible();
+
+  // The card shows TODAY — as the browser itself reckons it. This is the guard
+  // against parsing the API's "2026-07-12" as UTC midnight, which would render
+  // as *yesterday* anywhere west of Greenwich (design.md risk #9). Computing the
+  // expectation in the page keeps it honest about locale and timezone.
+  const today = await page.evaluate(() =>
+    new Date().toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+  );
+  await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
 
   // Survives a reload — it was really persisted, not just optimistic UI.
   await page.reload();
-  await expect(
-    page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),
-  ).toBeVisible();
+  await expect(watchedCard).toBeVisible();
+  await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
 
   // --- invite link (opens in a modal) ---
   await page.getByRole("button", { name: /Invite someone/ }).click();
@@ -64,6 +78,46 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await expect(page.getByRole("menuitem", { name: "Delete list" })).toHaveCount(0);
   await deleteOpenList(page);
   await expect(page.getByRole("link", { name: new RegExp(listName) })).toHaveCount(0);
+});
+
+test("open a movie, correct the date we actually watched it", async ({ page }) => {
+  const listName = `Detail ${Date.now()}`;
+
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Dev login" }).click();
+  await createAndOpenList(page, listName);
+
+  // Add a movie and mark it watched (which dates it "today").
+  await page.getByRole("button", { name: "+ Add movie" }).first().click();
+  await page.getByPlaceholder("Search movies…").fill("the matrix");
+  const result = page.locator(".result").filter({ hasText: "The Matrix" }).first();
+  await expect(result).toBeVisible({ timeout: 15_000 });
+  await result.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  const card = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
+  await card.getByRole("button", { name: "Options for The Matrix" }).click();
+  await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
+  await expect(page.locator(".movie.is-watched")).toBeVisible();
+
+  // --- the card body is a link to the detail page ---
+  await card.getByRole("link").click();
+  await expect(page.getByRole("heading", { name: "The Matrix" })).toBeVisible();
+  // Live TMDB metadata the DB snapshot doesn't hold.
+  await expect(page.getByText("Keanu Reeves")).toBeVisible({ timeout: 15_000 });
+
+  // --- but we actually watched it on the 4th ---
+  const dateInput = page.getByLabel("Watch date");
+  await dateInput.fill("2026-07-04");
+  await expect(page.getByText("Watched Sat, Jul 4, 2026")).toBeVisible();
+
+  // It really persisted — and the list shows the corrected date, not today.
+  await page.reload();
+  await expect(page.getByLabel("Watch date")).toHaveValue("2026-07-04");
+  await page.getByRole("link", { name: new RegExp(listName) }).click();
+  await expect(card.locator(".movie-watched")).toHaveText("Sat, Jul 4, 2026");
+
+  await deleteOpenList(page);
 });
 
 test("the list action buttons line up with each other", async ({ page }) => {
