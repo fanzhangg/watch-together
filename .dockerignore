@@ -12,10 +12,11 @@ backend/.venv/
 backend/.pytest_cache/
 backend/.mypy_cache/
 
-# Local databases
-*.db
-*.sqlite
-*.sqlite3
+# Local databases. NOTE the leading **/ — a bare "*.db" only matches the context
+# ROOT, so backend/dev.db would still be copied into the image (it was).
+**/*.db
+**/*.sqlite
+**/*.sqlite3
 
 # Node / build output (the image builds these itself)
 frontend/node_modules/

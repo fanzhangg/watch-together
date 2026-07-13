@@ -13,11 +13,13 @@ mark watched, invite someone). Next: deploy to Render (M6).
 ## Repo layout
 
 ```
-backend/    FastAPI app, SQLAlchemy, Alembic migrations, pytest
-frontend/   React + Vite SPA (built assets are served by the backend)
-Dockerfile  Multi-stage build (Node build -> Python runtime) used by Render
-render.yaml Render service definition
-docs/       Design doc
+backend/            FastAPI app, SQLAlchemy, Alembic migrations, pytest
+frontend/           React + Vite SPA (built assets are served by the backend)
+Dockerfile          Multi-stage build (Node build -> Python runtime); used by Render
+.dockerignore       Keeps .venv / node_modules / .env out of the image
+docker-compose.yml  Local stack: the image + a real Postgres
+render.yaml         Render service definition
+docs/               Design doc
 ```
 
 ## Prerequisites
@@ -25,6 +27,8 @@ docs/       Design doc
 - **Python 3.11+** (3.13 used here)
 - **Node 20+** — for local frontend dev only. Install with
   `winget install OpenJS.NodeJS.LTS`, then reopen the terminal.
+- **Docker Desktop** *(optional)* — only if you want to build/run the container
+  image or test against a real Postgres. `winget install Docker.DockerDesktop`.
 - A **Neon** Postgres database (free tier) — optional for local dev, which
   defaults to SQLite.
 - A **TMDB API key** (free) — only needed for *real* movie search. Get it from
@@ -85,6 +89,93 @@ once the backend is up just refresh the page.
 > setup. Run migrations once before logging in: `alembic upgrade head` (creates
 > the `users` table). Production uses Postgres/Neon via `DB_URL`.
 
+## Building and running with Docker
+
+One `docker build` produces **both** halves of the app. The [Dockerfile](Dockerfile)
+is multi-stage:
+
+```
+Stage 1  node:20-slim          Stage 2  python:3.13-slim  ← the final image
+┌──────────────────────┐       ┌────────────────────────────────────┐
+│ npm ci               │       │ pip install -r requirements.txt    │
+│ npm run build        │  ──▶  │ COPY --from=frontend  (built SPA)  │
+│  → backend/app/web   │       │ alembic upgrade head && uvicorn    │
+└──────────────────────┘       └────────────────────────────────────┘
+     discarded                  ~294 MB · Python + compiled SPA only
+```
+
+The Node stage is thrown away — the shipped image contains no Node and no
+`node_modules`, just Python and the compiled assets. One container serves the
+SPA **and** the API on a single origin, which is exactly what Render runs.
+
+[.dockerignore](.dockerignore) keeps local state out of the image: `.venv`,
+`node_modules`, `*.db`, and — importantly — **`backend/.env`, so your TMDB key is
+never baked into a layer**. The container gets its config from environment
+variables at run time. (Note the patterns use `**/*.db`, not `*.db`: Docker only
+matches a bare `*.db` at the context root, so `backend/dev.db` would otherwise
+sneak in.)
+
+> **Docker Desktop must actually be running**, not just installed. If you see
+> `failed to connect to the docker API ... dockerDesktopLinuxEngine`, start
+> Docker Desktop and wait for the whale icon to settle.
+
+### Option A — Compose: the app + a real Postgres (recommended)
+
+The closest local mirror of production (Render + Neon). Migrations run
+automatically once the database reports healthy.
+
+```bash
+docker compose up --build         # build + start  → http://localhost:8000
+docker compose up -d --build      # ...in the background
+docker compose logs -f app        # follow the app logs
+docker compose down               # stop
+docker compose down -v            # stop AND delete the database volume
+```
+
+Config: `backend/.env` is read for your `TMDB_API_KEY`; Compose supplies
+`DB_URL`, `DEV_LOGIN=true`, `SESSION_SECRET` and `APP_BASE_URL` itself
+(see [docker-compose.yml](docker-compose.yml)).
+
+### Option B — build and run the image on its own
+
+Useful for checking exactly what Render will build.
+
+```bash
+docker build -t watch-together .
+
+docker run --rm -p 8000:8000 \
+  -e DEV_LOGIN=true \
+  -e TMDB_API_KEY=your_key_here \
+  watch-together                  # → http://localhost:8000
+```
+
+With no `DB_URL`, the container falls back to a **SQLite file inside the
+container** — fine for a quick look, but it disappears when the container does.
+To point it at a real database (e.g. Neon), pass one:
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e DB_URL="postgresql://user:pass@host/db" \
+  -e TMDB_API_KEY=your_key_here \
+  watch-together
+```
+
+### Handy
+
+```bash
+docker compose exec app sh                       # shell inside the app container
+docker compose exec db psql -U watch -d watchtogether   # psql into the database
+docker compose build --no-cache app             # force a clean rebuild
+docker images watch-together                    # check the image size
+```
+
+> **Base-image pulls can fail with `EOF`** on flaky networks — it's a transient
+> Docker Hub / CDN hiccup, not a problem with the Dockerfile. Just run the build
+> again.
+
+> Day to day, prefer the two-terminal setup above — it has hot reload. Use Docker
+> to verify the image, the migrations, and the Postgres path before deploying.
+
 ## Testing
 
 ### Backend (pytest)
@@ -142,29 +233,6 @@ cd ../frontend && npm run e2e                     # 3. drive it
 It covers the happy path (sign in → create list → search TMDB → add movie →
 mark watched → invite link) and the signed-out invite preview. First run needs
 `npx playwright install chromium`.
-
-## Run with Docker (app + Postgres)
-
-The [Dockerfile](Dockerfile) is multi-stage and builds **both** halves: a Node
-stage compiles the React app, then a Python stage serves those built assets
-*and* the API from one origin. The Node stage is discarded — the final image is
-just Python + the compiled SPA (~294 MB). This is exactly what Render builds.
-
-`docker compose up` additionally runs a real **Postgres**, making it the closest
-local mirror of production (Render + Neon):
-
-```bash
-docker compose up --build      # → http://localhost:8000
-docker compose down            # stop
-docker compose down -v         # stop and delete the database volume
-```
-
-Migrations run automatically on start. Your `backend/.env` is read for
-`TMDB_API_KEY`; the database URL and dev-login are set by Compose.
-
-> Day-to-day, prefer the two-terminal setup above — it has hot reload. Use
-> Docker to verify the image, the migrations, and the Postgres path before
-> deploying.
 
 ## Database migrations
 
