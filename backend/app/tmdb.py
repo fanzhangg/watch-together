@@ -59,7 +59,6 @@ class MovieDetail(Movie):
     tagline: str | None = None
     runtime: int | None = None
     genres: list[str] = field(default_factory=list)
-    vote_average: float | None = None
     director: str | None = None
     cast: list[str] = field(default_factory=list)
 
@@ -173,7 +172,6 @@ def get_movie_detail(api_key: str, tmdb_id: int) -> MovieDetail:
         # TMDB sends 0 for "unknown runtime" — that's a null, not a 0-minute film.
         runtime=raw.get("runtime") or None,
         genres=[g["name"] for g in raw.get("genres", []) if g.get("name")],
-        vote_average=raw.get("vote_average") or None,
         director=director,
         cast=[
             person["name"]

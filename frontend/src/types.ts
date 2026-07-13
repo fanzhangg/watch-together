@@ -58,7 +58,6 @@ export interface MovieDetail extends MovieSearchResult {
   tagline: string | null;
   runtime: number | null;
   genres: string[];
-  vote_average: number | null;
   director: string | null;
   cast: string[];
 }

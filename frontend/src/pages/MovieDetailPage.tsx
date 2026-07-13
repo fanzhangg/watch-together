@@ -3,8 +3,8 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import DropdownMenu from "../components/DropdownMenu";
 import {
-  formatWatchedDate,
   posterUrl,
   todayISO,
   type Item,
@@ -115,7 +115,6 @@ export default function MovieDetailPage() {
           <div className="detail-meta">
             {item.release_year && <span>{item.release_year}</span>}
             {detail?.runtime && <span>{runtimeLabel(detail.runtime)}</span>}
-            {detail?.vote_average && <span>★ {detail.vote_average.toFixed(1)}</span>}
           </div>
 
           {detail?.tagline && <p className="detail-tagline">“{detail.tagline}”</p>}
@@ -130,47 +129,72 @@ export default function MovieDetailPage() {
             </div>
           )}
 
-          {/* --- the point of the page: when did we watch it --- */}
+          {/* The point of the page: when did we watch it. One control says it —
+              the date picker IS the watch date, so a formatted copy of it above
+              would just be the same fact twice. Everything destructive or rarer
+              (unwatch, remove) sits in the menu beside it. */}
           <section className={`watch-panel${watched ? " is-watched" : ""}`}>
             {watched && item.watched_on ? (
-              <>
-                <div>
-                  <div className="watch-panel-title">
-                    Watched {formatWatchedDate(item.watched_on)}
-                  </div>
-                  <label className="watch-date">
-                    <span className="muted">Change the date</span>
-                    <input
-                      type="date"
-                      aria-label="Watch date"
-                      value={item.watched_on}
-                      max={todayISO()}
-                      disabled={setDate.isPending}
-                      onChange={(e) => e.target.value && setDate.mutate(e.target.value)}
-                    />
-                  </label>
-                  {dateError && <p className="error">{dateError.message}</p>}
-                </div>
-                <button
-                  onClick={() => markUnwatched.mutate()}
-                  disabled={markUnwatched.isPending}
-                >
-                  ↩ Mark unwatched
-                </button>
-              </>
+              <label className="watch-date">
+                <span>Watched on</span>
+                <input
+                  type="date"
+                  aria-label="Watch date"
+                  value={item.watched_on}
+                  max={todayISO()}
+                  disabled={setDate.isPending}
+                  onChange={(e) => e.target.value && setDate.mutate(e.target.value)}
+                />
+              </label>
             ) : (
-              <>
-                <div className="watch-panel-title">Not watched yet</div>
-                <button
-                  className="primary"
-                  onClick={() => markWatched.mutate()}
-                  disabled={markWatched.isPending}
-                >
-                  ✓ Mark watched today
-                </button>
-              </>
+              <button
+                className="primary"
+                onClick={() => markWatched.mutate()}
+                disabled={markWatched.isPending}
+              >
+                ✓ Mark watched today
+              </button>
             )}
+
+            <DropdownMenu
+              label="Movie options"
+              triggerClassName="more-btn"
+              trigger="⋯"
+            >
+              {(close) => (
+                <>
+                  {watched && (
+                    <>
+                      <button
+                        className="menu-item"
+                        role="menuitem"
+                        disabled={markUnwatched.isPending}
+                        onClick={() => {
+                          close();
+                          markUnwatched.mutate();
+                        }}
+                      >
+                        ↩ Mark unwatched
+                      </button>
+                      <div className="menu-sep" />
+                    </>
+                  )}
+                  <button
+                    className="menu-item danger"
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      setConfirmRemove(true);
+                    }}
+                  >
+                    Remove from list
+                  </button>
+                </>
+              )}
+            </DropdownMenu>
           </section>
+
+          {dateError && <p className="error">{dateError.message}</p>}
 
           {(detail?.overview ?? item.overview) && (
             <p className="detail-overview">{detail?.overview ?? item.overview}</p>
@@ -193,13 +217,6 @@ export default function MovieDetailPage() {
               this movie was added.
             </p>
           )}
-
-          <button
-            className="ghost danger detail-remove"
-            onClick={() => setConfirmRemove(true)}
-          >
-            Remove from list
-          </button>
         </div>
       </article>
 

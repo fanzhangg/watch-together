@@ -50,7 +50,12 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
   // Sheet closed -> page scrolls again.
   await expect(page.locator("body")).not.toHaveClass(/no-scroll/);
 
-  const movie = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
+  // No title text on the card any more — the poster art carries it, so the card
+  // is identified by its link's accessible name.
+  const movie = page
+    .locator(".movie")
+    .filter({ has: page.getByRole("link", { name: "The Matrix" }) })
+    .first();
   await expect(movie).toBeVisible();
 
   // The card's "⋯" overlays the poster, so it doesn't get the row buttons' sizing
@@ -72,7 +77,9 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
 
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).tap();
   await expect(
-    page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),
+    page
+      .locator(".movie.is-watched")
+      .filter({ has: page.getByRole("link", { name: "The Matrix" }) }),
   ).toBeVisible();
 
   // Nothing overflows horizontally — the classic mobile layout bug.

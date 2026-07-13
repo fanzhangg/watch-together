@@ -94,7 +94,6 @@ class MovieDetail(BaseModel):
     tagline: str | None = None
     runtime: int | None = None  # minutes
     genres: list[str] = []
-    vote_average: float | None = None
     director: str | None = None
     cast: list[str] = []
 

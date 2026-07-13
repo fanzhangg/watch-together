@@ -3,8 +3,11 @@ import DropdownMenu from "./DropdownMenu";
 import { formatWatchedDate, posterUrl, type Item } from "../types";
 
 /**
- * Deliberately minimal: poster, title, and — if watched — the day it was
- * watched. Nothing else. Anything richer is a click away on the detail page.
+ * Poster, and — if watched — the day it was watched. That's all.
+ *
+ * The title isn't rendered: the poster already carries it, far better than we
+ * could. It moves to the link's aria-label so the card still has an accessible
+ * name, and it's only drawn for the rare movie with no poster art.
  *
  * The body is a link, so the quick actions live behind a "⋯" menu rather than
  * as buttons nested inside a tap target.
@@ -27,18 +30,24 @@ export default function MovieCard({
 
   return (
     <article className={`movie${watched ? " is-watched" : ""}`}>
-      <Link className="movie-link" to={`/lists/${listId}/items/${item.id}`}>
+      <Link
+        className="movie-link"
+        to={`/lists/${listId}/items/${item.id}`}
+        aria-label={item.title}
+      >
         {poster ? (
           <img className="poster" src={poster} alt="" loading="lazy" />
         ) : (
-          <div className="poster placeholder">🎞️</div>
+          <div className="poster placeholder">
+            <span aria-hidden="true">🎞️</span>
+            <span className="movie-title">{item.title}</span>
+          </div>
         )}
-        <div className="movie-body">
-          <div className="movie-title">{item.title}</div>
-          {watched && item.watched_on && (
+        {watched && item.watched_on && (
+          <div className="movie-body">
             <div className="movie-watched">{formatWatchedDate(item.watched_on)}</div>
-          )}
-        </div>
+          </div>
+        )}
       </Link>
 
       <DropdownMenu

@@ -268,27 +268,22 @@ input:focus-visible, button:focus-visible {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 1.1rem;
 }
-/* The card is a link with a "⋯" menu floated on top — poster, title, and the
-   watch date, nothing else. Everything richer is on the detail page. */
+/* The card is a poster with a "⋯" menu floated on top, plus the watch date if
+   it's been watched. No title — the poster art already carries it. Square
+   corners, so the artwork runs to the edge. */
 .movie {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow);
 }
 .movie.is-watched .poster { filter: grayscale(0.55); opacity: 0.75; }
-/* The clipping that rounds the poster's corners lives HERE, not on .movie —
-   `overflow: hidden` on the card would also cut off the "⋯" menu, which has to
-   escape the card's bounds to be readable. */
 .movie-link {
   display: flex;
   flex-direction: column;
   flex: 1;
-  border-radius: inherit;
-  overflow: hidden;
   color: inherit;
   text-decoration: none;
 }
@@ -353,14 +348,20 @@ input:focus-visible, button:focus-visible {
   display: block;
   background: var(--surface-2);
 }
+/* Only drawn for a movie with no poster art — then the title is all we have, so
+   it has to appear somewhere. */
 .poster.placeholder {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  text-align: center;
   color: var(--muted);
   font-size: 2rem;
 }
-.movie-body { padding: 0.65rem 0.7rem 0.7rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
-.movie-title { font-size: 0.92rem; font-weight: 550; line-height: 1.25; }
+.movie-body { padding: 0.5rem 0.6rem; }
+.movie-title { font-size: 0.92rem; font-weight: 550; line-height: 1.25; color: var(--text); }
 .movie-watched { color: var(--muted); font-size: 0.8rem; }
 
 /* --- movie detail page --- */
@@ -390,30 +391,29 @@ input:focus-visible, button:focus-visible {
 .detail-overview { line-height: 1.6; max-width: 65ch; }
 .detail-credit { font-size: 0.92rem; }
 .detail-credit .muted { margin-right: 0.5rem; }
-.detail-remove { align-self: start; margin-top: 0.5rem; }
 
-/* The reason the page exists: the watch date, and the controls that change it. */
+/* The reason the page exists: one control for the watch date, with the rarer
+   and destructive actions (unwatch, remove) tucked into the menu beside it. */
 .watch-panel {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 1rem;
+  gap: 0.6rem;
+  align-self: start;
+  padding: 0.85rem 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 .watch-panel.is-watched { border-color: var(--accent); }
-.watch-panel-title { font-weight: 550; }
-.watch-date { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; font-size: 0.85rem; }
+.watch-date { display: flex; align-items: center; gap: 0.6rem; font-weight: 550; }
 .watch-date input[type="date"] {
   font: inherit;
+  font-weight: 400;
   color: var(--text);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   color-scheme: light dark;
 }
 
@@ -595,8 +595,9 @@ input:focus-visible, button:focus-visible {
   .detail { grid-template-columns: 1fr; gap: 1.25rem; }
   .detail-poster { max-width: 200px; }
   .detail-body h1 { font-size: 1.45rem; }
-  .watch-panel { align-items: stretch; }
-  .watch-panel button { width: 100%; }
+  /* Fill the width, with the "⋯" pinned to the right of the watch control. */
+  .watch-panel { align-self: stretch; }
+  .watch-panel > :first-child { flex: 1; }
 
   .card-grid { grid-template-columns: 1fr; }
 

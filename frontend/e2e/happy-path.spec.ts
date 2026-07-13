@@ -31,8 +31,13 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await page.getByRole("button", { name: "Close" }).click();
 
   // --- it lands under "Want to watch" ---
+  // The card carries no title text (the poster art does), so it's found by the
+  // link's accessible name.
   await expect(page.getByRole("heading", { name: /Want to watch/ })).toBeVisible();
-  const movie = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
+  const movie = page
+    .locator(".movie")
+    .filter({ has: page.getByRole("link", { name: "The Matrix" }) })
+    .first();
   await expect(movie).toBeVisible();
 
   // --- mark watched, from the card's "⋯" menu (optimistic) ---
@@ -52,7 +57,9 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
 
   await expect(page.getByRole("heading", { name: /^Watched/ })).toBeVisible();
-  const watchedCard = page.locator(".movie.is-watched").filter({ hasText: "The Matrix" });
+  const watchedCard = page
+    .locator(".movie.is-watched")
+    .filter({ has: page.getByRole("link", { name: "The Matrix" }) });
   await expect(watchedCard).toBeVisible();
 
   // The card shows TODAY — as the browser itself reckons it. This is the guard
@@ -107,7 +114,10 @@ test("open a movie, correct the date we actually watched it", async ({ page }) =
   await result.getByRole("button", { name: "Add" }).click();
   await page.getByRole("button", { name: "Close" }).click();
 
-  const card = page.locator(".movie").filter({ hasText: "The Matrix" }).first();
+  const card = page
+    .locator(".movie")
+    .filter({ has: page.getByRole("link", { name: "The Matrix" }) })
+    .first();
   await card.getByRole("button", { name: "Options for The Matrix" }).click();
   await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
   await expect(page.locator(".movie.is-watched")).toBeVisible();
@@ -119,15 +129,54 @@ test("open a movie, correct the date we actually watched it", async ({ page }) =
   await expect(page.getByText("Keanu Reeves")).toBeVisible({ timeout: 15_000 });
 
   // --- but we actually watched it on the 4th ---
-  const dateInput = page.getByLabel("Watch date");
-  await dateInput.fill("2026-07-04");
-  await expect(page.getByText("Watched Sat, Jul 4, 2026")).toBeVisible();
+  // The picker IS the watch date — there's no formatted copy of it to check.
+  await page.getByLabel("Watch date").fill("2026-07-04");
 
   // It really persisted — and the list shows the corrected date, not today.
   await page.reload();
   await expect(page.getByLabel("Watch date")).toHaveValue("2026-07-04");
   await page.getByRole("link", { name: new RegExp(listName) }).click();
   await expect(card.locator(".movie-watched")).toHaveText("Sat, Jul 4, 2026");
+
+  await deleteOpenList(page);
+});
+
+test("unwatch and remove live in the detail page's ⋯ menu", async ({ page }) => {
+  const listName = `Menu ${Date.now()}`;
+
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Dev login" }).click();
+  await createAndOpenList(page, listName);
+
+  await page.getByRole("button", { name: "+ Add movie" }).first().click();
+  await page.getByPlaceholder("Search movies…").fill("the matrix");
+  const result = page.locator(".result").filter({ hasText: "The Matrix" }).first();
+  await expect(result).toBeVisible({ timeout: 15_000 });
+  await result.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("link", { name: "The Matrix" }).click();
+
+  // Unwatched: one button, no "not watched yet" restatement of it.
+  await expect(page.getByRole("button", { name: "✓ Mark watched today" })).toBeVisible();
+  await expect(page.getByText("Not watched yet")).toHaveCount(0);
+  // Destructive actions are never loose on the page.
+  await expect(page.getByRole("button", { name: "Remove from list" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
+  await expect(page.getByLabel("Watch date")).toBeVisible();
+
+  // Unwatch, from the menu.
+  await page.getByRole("button", { name: "Movie options" }).click();
+  await page.getByRole("menuitem", { name: "↩ Mark unwatched" }).click();
+  await expect(page.getByRole("button", { name: "✓ Mark watched today" })).toBeVisible();
+
+  // Remove, from the menu — via a confirm, then back to the list.
+  await page.getByRole("button", { name: "Movie options" }).click();
+  await page.getByRole("menuitem", { name: "Remove from list" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
+
+  await expect(page.getByText("No movies yet")).toBeVisible();
 
   await deleteOpenList(page);
 });
