@@ -10,6 +10,10 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter # ~$7/mo, always-on (no cold starts)
+    # Must match the Neon region (AWS us-west-2). The app queries the database on
+    # every request, so a cross-region pairing would add latency to every page
+    # load. A service's region cannot be changed after creation.
+    region: oregon
     healthCheckPath: /api/health
     envVars:
       # Neon POOLED connection string (the host contains "-pooler").

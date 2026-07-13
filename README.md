@@ -250,9 +250,22 @@ Set `DB_URL` (Neon pooled connection string) in `backend/.env` first.
 > Google is the *only* way in — without an OAuth client, nobody (including you)
 > can log into the deployed app.
 
+### Regions
+
+The app queries the database on every request, so **Render and Neon must be in
+the same region**. This project uses **Oregon / US West**:
+
+| | Region |
+|---|---|
+| Render | `oregon` — pinned in [render.yaml](render.yaml) |
+| Neon | **AWS `us-west-2`** (Oregon) — pick this when creating the project |
+
+A Render service's region **cannot be changed after creation**.
+
 ### 1. Database — Neon (~3 min)
 
-1. Sign up at <https://neon.tech> and create a project (`watch-together`).
+1. Sign up at <https://neon.tech> and create a project (`watch-together`),
+   choosing region **AWS us-west-2 (Oregon)**.
 2. Open **Connection Details** and toggle **Pooled connection** — the host must
    contain `-pooler`. Copy that string; it's your `DB_URL`.
 
