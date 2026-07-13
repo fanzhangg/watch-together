@@ -34,7 +34,11 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* No grey flash on tap; we provide our own :active feedback instead. */
+  -webkit-tap-highlight-color: transparent;
 }
+/* Set by the search dialog so the page can't scroll behind the sheet. */
+body.no-scroll { overflow: hidden; }
 
 h1, h2, h3 { line-height: 1.2; margin: 0; }
 a { color: inherit; }
@@ -99,19 +103,28 @@ button {
   padding: 0.5rem 0.85rem;
   transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
-button:hover:not(:disabled) { background: var(--surface-2); }
 button:disabled { opacity: 0.55; cursor: default; }
+/* Hover only on devices that actually hover — on touch it sticks after tapping. */
+@media (hover: hover) {
+  button:hover:not(:disabled) { background: var(--surface-2); }
+}
+button:active:not(:disabled) { transform: scale(0.97); }
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
   font-weight: 550;
 }
-button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
 button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
-button.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
-button.danger:hover:not(:disabled) { color: #d64545; border-color: #d6454533; }
 button.small { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+
+@media (hover: hover) {
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+  button.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+  button.danger:hover:not(:disabled) { color: #d64545; border-color: #d6454533; }
+  .list-card:hover { transform: translateY(-2px); }
+  .result:hover { background: var(--surface-2); }
+}
 
 input[type="text"], input[type="search"] {
   font: inherit;
@@ -143,7 +156,6 @@ input:focus-visible, button:focus-visible {
   box-shadow: var(--shadow);
   transition: transform 0.12s ease;
 }
-.list-card:hover { transform: translateY(-2px); }
 .list-card h3 { font-size: 1.05rem; margin-bottom: 0.3rem; }
 .badge {
   display: inline-block;
@@ -246,7 +258,6 @@ input:focus-visible, button:focus-visible {
   border-radius: 10px;
   align-items: center;
 }
-.result:hover { background: var(--surface-2); }
 .result img, .result .thumb {
   width: 46px;
   height: 69px;
@@ -307,7 +318,81 @@ input:focus-visible, button:focus-visible {
 .divider { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.8rem; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-@media (max-width: 520px) {
-  .movie-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  .container { padding: 1.25rem 0.9rem 3rem; }
+/* Destructive actions live at the bottom, away from what you tap every day. */
+.danger-zone {
+  margin-top: 3.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Floating "add movie" button — mobile only, so adding is always one thumb-tap
+   away instead of a scroll back to the top. */
+.fab {
+  display: none;
+  position: fixed;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0;
+  z-index: 20;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+}
+
+/* ---------------- mobile ---------------- */
+@media (max-width: 640px) {
+  .container { padding: 1.1rem 0.9rem 6rem; } /* room for the FAB */
+
+  /* Comfortable, accessible tap targets (>=44px). */
+  button { min-height: 44px; padding: 0.6rem 0.9rem; }
+  button.small { min-height: 40px; }
+  .header-user button { min-height: 36px; }
+
+  .fab { display: grid; place-items: center; }
+  /* The FAB replaces the header button on mobile. */
+  .actions .add-movie { display: none; }
+
+  .page-head { flex-direction: column; align-items: stretch; gap: 0.9rem; }
+  .page-head h1 { font-size: 1.45rem; }
+  .actions { flex-direction: column; align-items: stretch; }
+  .actions > * , .actions button { width: 100%; }
+
+  .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .movie-body { padding: 0.55rem 0.6rem 0.6rem; }
+  .movie-title { font-size: 0.86rem; }
+  .movie-actions button { min-height: 40px; }
+  .movie-actions button.ghost { width: 40px; flex: none; }
+
+  .card-grid { grid-template-columns: 1fr; }
+
+  /* Search becomes a full-screen sheet rather than a floating box. */
+  .dialog-backdrop { padding: 0; }
+  .dialog {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: none;
+    border-radius: 0;
+  }
+  .dialog-head { padding: calc(0.75rem + env(safe-area-inset-top)) 0.75rem 0.75rem; }
+  .dialog-body {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    overscroll-behavior: contain; /* don't scroll the page behind the sheet */
+  }
+  .result { padding: 0.6rem 0.5rem; }
+  .result img, .result .thumb { width: 54px; height: 81px; }
+  .result-info .o { -webkit-line-clamp: 2; }
+
+  .center-card { margin: 6vh auto; padding: 1.5rem; }
+}
+
+@media (max-width: 380px) {
+  .movie-actions { flex-direction: column; }
+  .movie-actions button.ghost { width: 100%; }
 }

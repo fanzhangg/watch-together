@@ -34,6 +34,12 @@ export default function MovieSearchDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Stop the page scrolling behind the sheet (very noticeable on mobile).
+  useEffect(() => {
+    document.body.classList.add("no-scroll");
+    return () => document.body.classList.remove("no-scroll");
+  }, []);
+
   const { data: results, isFetching, error } = useQuery<MovieSearchResult[]>({
     queryKey: ["tmdb", debounced],
     queryFn: () => api.searchMovies(debounced),

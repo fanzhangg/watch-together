@@ -95,23 +95,14 @@ export default function ListPage() {
           </div>
         </div>
         <div className="actions">
-          <button className="primary" onClick={() => setSearchOpen(true)}>
+          {/* On mobile this is replaced by the floating button (see .fab). */}
+          <button
+            className="primary add-movie"
+            onClick={() => setSearchOpen(true)}
+          >
             + Add movie
           </button>
           <InviteButton listId={id} />
-          {list?.role === "owner" && (
-            <button
-              className="ghost danger"
-              onClick={() => {
-                if (confirm(`Delete “${list.name}” and all its movies?`)) {
-                  deleteList.mutate();
-                }
-              }}
-              disabled={deleteList.isPending}
-            >
-              Delete list
-            </button>
-          )}
         </div>
       </div>
 
@@ -166,6 +157,31 @@ export default function ListPage() {
           </div>
         </>
       )}
+
+      {list?.role === "owner" && (
+        <div className="danger-zone">
+          <button
+            className="ghost danger"
+            onClick={() => {
+              if (confirm(`Delete “${list.name}” and all its movies?`)) {
+                deleteList.mutate();
+              }
+            }}
+            disabled={deleteList.isPending}
+          >
+            Delete list
+          </button>
+        </div>
+      )}
+
+      {/* Mobile: adding a movie is always one thumb-tap away. */}
+      <button
+        className="fab"
+        aria-label="Add movie"
+        onClick={() => setSearchOpen(true)}
+      >
+        +
+      </button>
 
       {searchOpen && (
         <MovieSearchDialog
