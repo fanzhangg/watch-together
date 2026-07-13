@@ -58,24 +58,14 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
     .first();
   await expect(movie).toBeVisible();
 
-  // The card's "⋯" overlays the poster, so it doesn't get the row buttons' sizing
-  // for free — assert it's still a comfortable tap target.
-  const more = movie.getByRole("button", { name: "Options for The Matrix" });
-  const moreBox = (await more.boundingBox())!;
-  expect(moreBox.height).toBeGreaterThanOrEqual(44);
-  expect(moreBox.width).toBeGreaterThanOrEqual(44);
+  // The card carries no controls at all — it's one big tap target that opens the
+  // movie, which is where marking it watched lives.
+  await expect(movie.getByRole("button")).toHaveCount(0);
+  await movie.getByRole("link").tap();
+  await page.getByRole("button", { name: "✓ Mark watched today" }).tap();
+  await expect(page.getByLabel("Watch date")).toBeVisible();
 
-  await more.tap();
-
-  // This card is in the LEFT column, where the menu — right-aligned to a narrow
-  // poster — used to hang off the left edge of the screen. Leftward overflow
-  // creates no scrollbar, so the items were unreachable, not just ugly.
-  const menuBox = (await page.locator(".menu-popover").boundingBox())!;
-  expect(menuBox.x).toBeGreaterThanOrEqual(0);
-  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
-  await expect(page.getByRole("menuitem", { name: "Remove from list" })).toBeVisible();
-
-  await page.getByRole("menuitem", { name: "✓ Mark watched" }).tap();
+  await page.getByRole("link", { name: new RegExp(listName) }).tap();
   await expect(
     page
       .locator(".movie.is-watched")

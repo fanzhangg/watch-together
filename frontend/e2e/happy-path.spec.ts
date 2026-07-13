@@ -40,21 +40,12 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
     .first();
   await expect(movie).toBeVisible();
 
-  // --- mark watched, from the card's "⋯" menu (optimistic) ---
-  await movie.getByRole("button", { name: "Options for The Matrix" }).click();
-
-  // The menu must be fully on screen. It is right-aligned to a ~160px poster, so
-  // anything wider than the card hangs off the LEFT edge of the screen for a
-  // first-column card — and leftward overflow makes no scrollbar, so those items
-  // are simply unreachable. Bounding it to the card is what prevents that.
-  const menuBox = (await page.locator(".menu-popover").boundingBox())!;
-  const cardBox = (await movie.boundingBox())!;
-  expect(menuBox.width).toBeLessThanOrEqual(cardBox.width);
-  expect(menuBox.x).toBeGreaterThanOrEqual(0);
-  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await expect(page.getByRole("menuitem", { name: "Remove from list" })).toBeVisible();
-
-  await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
+  // --- the card is a pure link: every action on a movie is on its detail page ---
+  await expect(movie.getByRole("button")).toHaveCount(0);
+  await movie.getByRole("link").click();
+  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
+  await expect(page.getByLabel("Watch date")).toBeVisible();
+  await page.getByRole("link", { name: new RegExp(listName) }).click();
 
   await expect(page.getByRole("heading", { name: /^Watched/ })).toBeVisible();
   const watchedCard = page
@@ -118,13 +109,12 @@ test("open a movie, correct the date we actually watched it", async ({ page }) =
     .locator(".movie")
     .filter({ has: page.getByRole("link", { name: "The Matrix" }) })
     .first();
-  await card.getByRole("button", { name: "Options for The Matrix" }).click();
-  await page.getByRole("menuitem", { name: "✓ Mark watched" }).click();
-  await expect(page.locator(".movie.is-watched")).toBeVisible();
 
-  // --- the card body is a link to the detail page ---
+  // --- the card is a link to the detail page, where it gets marked watched ---
   await card.getByRole("link").click();
   await expect(page.getByRole("heading", { name: "The Matrix" })).toBeVisible();
+  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
+  await expect(page.getByLabel("Watch date")).toBeVisible();
   // Live TMDB metadata the DB snapshot doesn't hold.
   await expect(page.getByText("Keanu Reeves")).toBeVisible({ timeout: 15_000 });
 

@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import Avatar, { displayName } from "../components/Avatar";
 import ConfirmDialog from "../components/ConfirmDialog";
 import DropdownMenu from "../components/DropdownMenu";
 import InviteButton from "../components/InviteButton";
 import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
-import { todayISO, type Item, type ListDetail, type Status } from "../types";
+import type { Item, ListDetail } from "../types";
 
 export default function ListPage() {
   const { id = "" } = useParams();
@@ -27,43 +28,6 @@ export default function ListPage() {
   const { data: items, isPending } = useQuery<Item[]>({
     queryKey: itemsKey,
     queryFn: () => api.getItems(id),
-  });
-
-  // Optimistic toggle: flip it in the cache immediately, roll back on failure.
-  // watched_on moves with the status — the card renders the date, so leaving it
-  // for the refetch would flash a dateless "Watched" card.
-  const toggle = useMutation({
-    mutationFn: ({ item, status }: { item: Item; status: Status }) =>
-      status === "watched"
-        ? api.markWatched(id, item.id)
-        : api.markUnwatched(id, item.id),
-    onMutate: async ({ item, status }) => {
-      await qc.cancelQueries({ queryKey: itemsKey });
-      const previous = qc.getQueryData<Item[]>(itemsKey);
-      const watched_on = status === "watched" ? todayISO() : null;
-      qc.setQueryData<Item[]>(itemsKey, (old) =>
-        old?.map((i) => (i.id === item.id ? { ...i, status, watched_on } : i)),
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(itemsKey, ctx.previous);
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: itemsKey }),
-  });
-
-  const remove = useMutation({
-    mutationFn: (item: Item) => api.deleteItem(id, item.id),
-    onMutate: async (item) => {
-      await qc.cancelQueries({ queryKey: itemsKey });
-      const previous = qc.getQueryData<Item[]>(itemsKey);
-      qc.setQueryData<Item[]>(itemsKey, (old) => old?.filter((i) => i.id !== item.id));
-      return { previous };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(itemsKey, ctx.previous);
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: itemsKey }),
   });
 
   const renameList = useMutation({
@@ -108,13 +72,18 @@ export default function ListPage() {
   return (
     <>
       <div className="page-head">
-        <div>
+        {/* Who's in this list sits beside its name — the faces are the whole
+            point, so no names, and small enough not to compete with the title. */}
+        <div className="list-title">
           <h1>{list?.name ?? "…"}</h1>
-          <div className="members" style={{ marginTop: "0.5rem" }}>
+          <div className="members">
             {list?.members.map((m) => (
-              <span className="chip" key={m.user.id}>
-                {m.user.display_name ?? m.user.email}
-              </span>
+              <Avatar
+                key={m.user.id}
+                user={m.user}
+                size={24}
+                label={displayName(m.user)}
+              />
             ))}
           </div>
         </div>
@@ -184,13 +153,7 @@ export default function ListPage() {
           <h2 className="section-title">Want to watch</h2>
           <div className="movie-grid">
             {want.map((item) => (
-              <MovieCard
-                key={item.id}
-                item={item}
-                listId={id}
-                onToggle={() => toggle.mutate({ item, status: "watched" })}
-                onRemove={() => remove.mutate(item)}
-              />
+              <MovieCard key={item.id} item={item} listId={id} />
             ))}
           </div>
         </>
@@ -201,13 +164,7 @@ export default function ListPage() {
           <h2 className="section-title">Watched</h2>
           <div className="movie-grid">
             {watched.map((item) => (
-              <MovieCard
-                key={item.id}
-                item={item}
-                listId={id}
-                onToggle={() => toggle.mutate({ item, status: "want_to_watch" })}
-                onRemove={() => remove.mutate(item)}
-              />
+              <MovieCard key={item.id} item={item} listId={id} />
             ))}
           </div>
         </>

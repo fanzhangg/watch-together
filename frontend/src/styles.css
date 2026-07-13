@@ -286,59 +286,11 @@ input:focus-visible, button:focus-visible {
   color: inherit;
   text-decoration: none;
 }
-/* An open menu must paint over neighbouring cards — each one is its own
-   stacking context (they transform on hover), so without this the popover
-   slides underneath the card to its right. */
-.movie:has(.menu-popover) { z-index: 30; }
 @media (hover: hover) {
   .movie:hover { transform: translateY(-2px); }
   .movie:hover .movie-title { color: var(--accent); }
 }
 .movie { transition: transform 0.12s ease; }
-
-/* Sits over the poster's top-right corner, out of the title's way.
-   The anchor is stretched across the card's full width (rather than wrapping
-   just the button) so that `max-width: 100%` on the popover below resolves
-   against the CARD. It's click-through, so it doesn't steal taps from the link
-   underneath — only the button and the menu itself take pointer events. */
-.movie .menu-anchor {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  left: 0.4rem;
-  justify-content: flex-end;
-  pointer-events: none;
-  z-index: 1;
-}
-.movie .menu-anchor > * { pointer-events: auto; }
-
-/* The shared popover has a 240px min-width, sized for the header menus. Hanging
-   that off a ~160px poster pushes its left edge past the left edge of the SCREEN
-   for any card in the first column — and leftward overflow is unreachable (it
-   makes no scrollbar), so those items were simply gone. Bound the card menu to
-   the card it belongs to, which can never itself be off-screen. */
-.movie .menu-popover { min-width: 0; width: max-content; max-width: 100%; }
-/* Bounded to the card, the labels have ~140px to live in — trim the horizontal
-   padding so they fit on one line rather than wrapping. Below ~360px they still
-   wrap, which is fine: readable beats clipped. */
-.movie .menu-item { padding-left: 0.6rem; padding-right: 0.6rem; font-size: 0.88rem; }
-.card-more-btn {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  min-height: 0;
-  padding: 0;
-  font-size: 1.05rem;
-  line-height: 1;
-  color: #fff;
-  background: rgb(0 0 0 / 0.55);
-  border-color: transparent;
-  backdrop-filter: blur(4px);
-}
-@media (hover: hover) {
-  .card-more-btn:hover:not(:disabled) { background: rgb(0 0 0 / 0.75); }
-}
 
 .poster {
   aspect-ratio: 2 / 3;
@@ -536,7 +488,17 @@ input:focus-visible, button:focus-visible {
 }
 
 /* --- members --- */
-.members { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+/* The list's name, with the faces of its members beside it. */
+.list-title { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+/* Faces of everyone in the list, overlapped into a stack. The ring is the page
+   background, so they read as a group rather than a row of loose circles. */
+.members { display: flex; align-items: center; }
+.members .avatar {
+  border: 2px solid var(--bg);
+  box-sizing: content-box;
+}
+.members .avatar + .avatar { margin-left: -0.55rem; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -628,7 +590,6 @@ input:focus-visible, button:focus-visible {
   .movie-watched { font-size: 0.47rem; }
   /* The card's "⋯" is a floating overlay, not a row button — keep it square at
      the app's 44px tap target rather than letting min-height stretch it. */
-  .card-more-btn { min-height: 44px; height: 44px; width: 44px; }
 
   /* One column: a poster beside a full metadata column doesn't fit a phone. */
   .detail { grid-template-columns: 1fr; gap: 1.25rem; }
