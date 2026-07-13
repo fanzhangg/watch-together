@@ -5,6 +5,7 @@ import { api } from "../api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import DropdownMenu from "../components/DropdownMenu";
 import InviteButton from "../components/InviteButton";
+import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
 import type { Item, ListDetail, Status } from "../types";
@@ -15,6 +16,7 @@ export default function ListPage() {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
 
   const itemsKey = ["items", id];
 
@@ -57,6 +59,16 @@ export default function ListPage() {
       if (ctx?.previous) qc.setQueryData(itemsKey, ctx.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: itemsKey }),
+  });
+
+  const renameList = useMutation({
+    mutationFn: (name: string) => api.renameList(id, name),
+    onSuccess: () => {
+      // Refresh both the open list and the collection it appears in.
+      qc.invalidateQueries({ queryKey: ["list", id] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      setRenaming(false);
+    },
   });
 
   const deleteList = useMutation({
@@ -113,16 +125,29 @@ export default function ListPage() {
               trigger="⋯"
             >
               {(close) => (
-                <button
-                  className="menu-item danger"
-                  role="menuitem"
-                  onClick={() => {
-                    close();
-                    setConfirmDelete(true);
-                  }}
-                >
-                  Delete list
-                </button>
+                <>
+                  <button
+                    className="menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      setRenaming(true);
+                    }}
+                  >
+                    Rename list
+                  </button>
+                  <div className="menu-sep" />
+                  <button
+                    className="menu-item danger"
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      setConfirmDelete(true);
+                    }}
+                  >
+                    Delete list
+                  </button>
+                </>
               )}
             </DropdownMenu>
           )}
@@ -179,6 +204,18 @@ export default function ListPage() {
             ))}
           </div>
         </>
+      )}
+
+      {renaming && list && (
+        <ListNameDialog
+          title="Rename list"
+          initialName={list.name}
+          submitLabel="Save"
+          busy={renameList.isPending}
+          error={renameList.error as Error | null}
+          onSubmit={(name) => renameList.mutate(name)}
+          onClose={() => setRenaming(false)}
+        />
       )}
 
       {confirmDelete && list && (

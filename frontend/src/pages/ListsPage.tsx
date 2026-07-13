@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import NewListDialog from "../components/NewListDialog";
+import ListNameDialog from "../components/ListNameDialog";
 import type { ListSummary } from "../types";
 
 export default function ListsPage() {
+  const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
 
   const {
@@ -15,6 +16,14 @@ export default function ListsPage() {
   } = useQuery<ListSummary[]>({
     queryKey: ["lists"],
     queryFn: api.getLists,
+  });
+
+  const create = useMutation({
+    mutationFn: (name: string) => api.createList(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      setNewOpen(false);
+    },
   });
 
   return (
@@ -70,7 +79,17 @@ export default function ListsPage() {
         +
       </button>
 
-      {newOpen && <NewListDialog onClose={() => setNewOpen(false)} />}
+      {newOpen && (
+        <ListNameDialog
+          title="New list"
+          description="Give it a name you’ll both recognise."
+          submitLabel="Create list"
+          busy={create.isPending}
+          error={create.error as Error | null}
+          onSubmit={(name) => create.mutate(name)}
+          onClose={() => setNewOpen(false)}
+        />
+      )}
     </>
   );
 }

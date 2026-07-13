@@ -87,6 +87,42 @@ test("the list action buttons line up with each other", async ({ page }) => {
   await deleteOpenList(page);
 });
 
+test("rename a list from the ⋯ menu", async ({ page }) => {
+  const before = `Rename ${Date.now()}`;
+  const after = `${before} renamed`;
+
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Dev login" }).click();
+  await createAndOpenList(page, before);
+
+  // Rename lives behind the same menu as delete, not loose on the page.
+  await expect(page.getByRole("menuitem", { name: "Rename list" })).toHaveCount(0);
+  await page.getByRole("button", { name: "List options" }).click();
+  await page.getByRole("menuitem", { name: "Rename list" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Rename list" });
+  await expect(dialog).toBeVisible();
+  // Prefilled with the current name, and Save is disabled until it changes.
+  await expect(dialog.getByLabel("List name")).toHaveValue(before);
+  await expect(dialog.getByRole("button", { name: "Save" })).toBeDisabled();
+
+  await dialog.getByLabel("List name").fill(after);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+
+  // The heading updates...
+  await expect(page.getByRole("heading", { name: after })).toBeVisible();
+  // ...and so does the lists page (it really persisted, not just local state).
+  await page.reload();
+  await expect(page.getByRole("heading", { name: after })).toBeVisible();
+  await page.getByRole("link", { name: "Watch Together" }).click();
+  await expect(page.getByRole("link", { name: after })).toBeVisible();
+  await expect(page.getByRole("link", { name: before, exact: true })).toHaveCount(0);
+
+  await page.getByRole("link", { name: after }).click();
+  await deleteOpenList(page);
+});
+
 test("avatar opens a profile menu, which is where sign out lives", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "Dev login" }).click();
