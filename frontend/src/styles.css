@@ -173,7 +173,9 @@ button.destructive {
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
-.page-head h1 { font-size: 1.6rem; }
+/* The page's own name should outrank anything on it — it was smaller than a
+   movie's title on the detail page (1.9rem), which read as backwards. */
+.page-head h1 { font-size: 2.1rem; letter-spacing: -0.01em; }
 .subtitle { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
 .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
@@ -575,7 +577,7 @@ input:focus-visible, button:focus-visible {
   .lists-actions { display: none; }
 
   .page-head { flex-direction: column; align-items: stretch; gap: 0.9rem; }
-  .page-head h1 { font-size: 1.45rem; }
+  .page-head h1 { font-size: 1.7rem; }
   /* "+ Add movie" is hidden on mobile (the FAB replaces it), leaving Invite to
      take the row with the "⋯" menu tucked beside it. */
   .actions { flex-direction: row; align-items: stretch; gap: 0.5rem; }
