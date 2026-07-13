@@ -72,6 +72,37 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await expect(page.getByRole("link", { name: new RegExp(listName) })).toHaveCount(0);
 });
 
+test("avatar opens a profile menu, which is where sign out lives", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Dev login" }).click();
+  await expect(page.getByRole("heading", { name: "Your lists" })).toBeVisible();
+
+  // Sign out is not sitting in the header any more — it's behind the avatar.
+  await expect(page.getByRole("menuitem", { name: "Sign out" })).toHaveCount(0);
+
+  const avatar = page.getByRole("button", { name: "Account menu" });
+  await avatar.click();
+
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText("dev@local")).toBeVisible();
+
+  // Escape closes it.
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+
+  // Clicking outside closes it too.
+  await avatar.click();
+  await expect(menu).toBeVisible();
+  await page.locator("main").click({ position: { x: 5, y: 5 } });
+  await expect(menu).toBeHidden();
+
+  // And signing out from the menu really signs you out.
+  await avatar.click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page.getByRole("button", { name: "Dev login" })).toBeVisible();
+});
+
 test("invite page shows a preview and asks a signed-out visitor to sign in", async ({
   browser,
 }) => {
