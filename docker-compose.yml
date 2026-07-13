@@ -1,0 +1,45 @@
+# Run the whole app locally the way production runs it: one container serving the
+# built SPA + API, talking to a real Postgres.
+#
+#   docker compose up --build     -> http://localhost:8000
+#
+# This is the closest local mirror of Render + Neon. Day-to-day development is
+# still faster with the two-terminal setup in the README (hot reload); use this
+# to verify the image, the migrations, and the Postgres path.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: watch
+      POSTGRES_PASSWORD: watch
+      POSTGRES_DB: watchtogether
+    ports:
+      - "5432:5432" # exposed so the test suite can point at it too
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watch -d watchtogether"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy # don't run migrations before Postgres is up
+    # Picks up TMDB_API_KEY (and anything else) from your local backend/.env.
+    # Everything under `environment:` below takes precedence over that file.
+    env_file:
+      - backend/.env
+    environment:
+      DB_URL: postgresql://watch:watch@db:5432/watchtogether
+      DEV_LOGIN: "true"
+      SESSION_SECRET: local-docker-secret
+      SESSION_COOKIE_SECURE: "false" # plain http locally
+      APP_BASE_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

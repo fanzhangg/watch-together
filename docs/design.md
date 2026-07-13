@@ -276,10 +276,13 @@ Risks **1, 2, and 3** are the ones that eat an afternoon if found late — all t
 - **Backend:** `pytest` + FastAPI `TestClient` against a **real Postgres**
   (throwaway **Neon branch** or local Docker PG — *not* SQLite, so `UNIQUE` /
   constraints behave like prod). Transactional fixture rolls back per test.
-  - **Interim (M1):** to keep momentum before a Postgres was provisioned, the
-    M1 suite runs on in-memory **SQLite** (portable model types, `create_all`).
-    Fine for the users table; switch to Postgres by **M2/M3**, where membership
-    403s and idempotent-add (`ON CONFLICT`) genuinely need prod semantics.
+  - **Interim (M1–M5):** to keep momentum before a Postgres was provisioned, the
+    suite ran on in-memory **SQLite** (portable model types, `create_all`).
+  - **Resolved:** `docker compose` now provides a real Postgres, and the full
+    suite passes against it (`TEST_DATABASE_URL=...`, see README). SQLite stays
+    the fast default for the inner loop; Postgres is the prod-accurate check.
+    This matters — SQLite silently ignored `ON DELETE CASCADE` and hid a real
+    bug in M2 until the pragma was enabled.
 - **Frontend:** minimal — **Playwright** for 2–3 critical end-to-end flows.
 - **Manual / `/verify`:** drive the flow in a browser for UI-polish items not
   worth automating.

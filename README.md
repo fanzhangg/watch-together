@@ -102,13 +102,21 @@ membership/403 access-control tests. Tests use an in-memory SQLite DB per test
 by default.
 
 To run the **same tests against real Postgres** (prod-accurate constraints —
-recommended from M2 on), point them at a throwaway Neon branch:
+`ON DELETE CASCADE`, `UNIQUE`, etc. behave exactly as in production), start the
+Compose stack and point the suite at it:
 
-```powershell
-$env:TEST_DATABASE_URL = "<neon test-branch pooled connection string>"
-pytest
+```bash
+docker compose up -d db
+docker compose exec -T db psql -U watch -d watchtogether -c "CREATE DATABASE watchtogether_test;"
 ```
 
+```powershell
+cd backend
+$env:TEST_DATABASE_URL = "postgresql://watch:watch@localhost:5432/watchtogether_test"
+pytest        # all 38 pass on Postgres as well as SQLite
+```
+
+(A throwaway Neon branch works the same way — just use its connection string.)
 See [docs/design.md](docs/design.md) section 11.
 
 ### Frontend
@@ -134,6 +142,29 @@ cd ../frontend && npm run e2e                     # 3. drive it
 It covers the happy path (sign in → create list → search TMDB → add movie →
 mark watched → invite link) and the signed-out invite preview. First run needs
 `npx playwright install chromium`.
+
+## Run with Docker (app + Postgres)
+
+The [Dockerfile](Dockerfile) is multi-stage and builds **both** halves: a Node
+stage compiles the React app, then a Python stage serves those built assets
+*and* the API from one origin. The Node stage is discarded — the final image is
+just Python + the compiled SPA (~294 MB). This is exactly what Render builds.
+
+`docker compose up` additionally runs a real **Postgres**, making it the closest
+local mirror of production (Render + Neon):
+
+```bash
+docker compose up --build      # → http://localhost:8000
+docker compose down            # stop
+docker compose down -v         # stop and delete the database volume
+```
+
+Migrations run automatically on start. Your `backend/.env` is read for
+`TMDB_API_KEY`; the database URL and dev-login are set by Compose.
+
+> Day-to-day, prefer the two-terminal setup above — it has hot reload. Use
+> Docker to verify the image, the migrations, and the Postgres path before
+> deploying.
 
 ## Database migrations
 
