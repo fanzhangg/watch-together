@@ -65,12 +65,20 @@ a { color: inherit; }
   font-size: 1.05rem;
 }
 /* --- dropdown menus (header avatar, list "⋯") --- */
-.menu-anchor { position: relative; flex: none; }
+/* The anchor exists only to position the popover. Making it a flex box lets its
+   trigger stretch to the row height, so "⋯" lines up with the sibling buttons
+   instead of being short (they stretch as direct children of .actions; the
+   button inside this wrapper would not). */
+.menu-anchor { position: relative; flex: none; display: flex; }
 
 .more-btn {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  padding: 0 0.7rem;
   font-size: 1.15rem;
   line-height: 1;
-  padding: 0.5rem 0.7rem;
   color: var(--muted);
 }
 

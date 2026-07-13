@@ -73,6 +73,29 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await expect(page.getByRole("link", { name: new RegExp(listName) })).toHaveCount(0);
 });
 
+test("the list action buttons line up with each other", async ({ page }) => {
+  const listName = `Align ${Date.now()}`;
+
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Dev login" }).click();
+  await page.getByPlaceholder("New list name").fill(listName);
+  await page.getByRole("button", { name: "Create" }).click();
+  await page.getByRole("link", { name: new RegExp(listName) }).click();
+
+  const add = (await page.locator(".actions .add-movie").boundingBox())!;
+  const invite = (await page.locator(".actions .invite-btn").boundingBox())!;
+  const more = (await page.locator(".actions .more-btn").boundingBox())!;
+
+  // The "⋯" trigger sits inside a positioning wrapper, so it does not stretch
+  // to the row height for free — assert it really is the same size and on the
+  // same baseline as its siblings.
+  expect(Math.round(more.height)).toBe(Math.round(invite.height));
+  expect(Math.round(add.height)).toBe(Math.round(invite.height));
+  expect(Math.round(more.y)).toBe(Math.round(invite.y));
+
+  await deleteOpenList(page);
+});
+
 test("avatar opens a profile menu, which is where sign out lives", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "Dev login" }).click();
