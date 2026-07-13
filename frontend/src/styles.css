@@ -449,8 +449,11 @@ input:focus-visible, button:focus-visible {
   .menu-popover { min-width: min(280px, calc(100vw - 2rem)); }
 
   .fab { display: grid; place-items: center; }
-  /* The FAB replaces the header button on mobile. */
+  /* The FAB replaces the header "add" button on mobile. On the lists page that
+     button is the only action, so the whole row goes rather than leaving an
+     empty flex box (which would still eat the page-head gap). */
   .actions .add-movie { display: none; }
+  .lists-actions { display: none; }
 
   .page-head { flex-direction: column; align-items: stretch; gap: 0.9rem; }
   .page-head h1 { font-size: 1.45rem; }

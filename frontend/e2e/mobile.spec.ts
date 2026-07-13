@@ -1,5 +1,5 @@
 import { devices, expect, test } from "@playwright/test";
-import { deleteOpenList } from "./helpers";
+import { createAndOpenList, deleteOpenList } from "./helpers";
 
 // Emulates a real phone (viewport + touch + mobile UA), not just a narrow window.
 // Pixel 5 rather than an iPhone because its default engine is Chromium — the one
@@ -14,9 +14,9 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
   await page.goto("/login");
   await page.getByRole("button", { name: "Dev login" }).tap();
 
-  await page.getByPlaceholder("New list name").fill(listName);
-  await page.getByRole("button", { name: "Create" }).tap();
-  await page.getByRole("link", { name: new RegExp(listName) }).tap();
+  // On mobile the list is created from the FAB too (header button is hidden).
+  await expect(page.locator(".lists-actions")).toBeHidden();
+  await createAndOpenList(page, listName);
 
   // The header "+ Add movie" is hidden on mobile; the FAB replaces it.
   await expect(page.locator(".actions .add-movie")).toBeHidden();

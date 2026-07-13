@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { deleteOpenList } from "./helpers";
+import { createAndOpenList, deleteOpenList } from "./helpers";
 
 /**
  * The M5 happy path, driven through the real UI in a browser:
@@ -14,15 +14,8 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await page.getByRole("button", { name: "Dev login" }).click();
   await expect(page.getByRole("heading", { name: "Your lists" })).toBeVisible();
 
-  // --- create a list ---
-  await page.getByPlaceholder("New list name").fill(listName);
-  await page.getByRole("button", { name: "Create" }).click();
-
-  const card = page.getByRole("link", { name: new RegExp(listName) });
-  await expect(card).toBeVisible();
-  await card.click();
-
-  await expect(page.getByRole("heading", { name: listName })).toBeVisible();
+  // --- create a list (button -> dialog, same as adding a movie) ---
+  await createAndOpenList(page, listName);
   await expect(page.getByText("No movies yet")).toBeVisible();
 
   // --- add a movie via TMDB search ---
@@ -78,9 +71,7 @@ test("the list action buttons line up with each other", async ({ page }) => {
 
   await page.goto("/login");
   await page.getByRole("button", { name: "Dev login" }).click();
-  await page.getByPlaceholder("New list name").fill(listName);
-  await page.getByRole("button", { name: "Create" }).click();
-  await page.getByRole("link", { name: new RegExp(listName) }).click();
+  await createAndOpenList(page, listName);
 
   const add = (await page.locator(".actions .add-movie").boundingBox())!;
   const invite = (await page.locator(".actions .invite-btn").boundingBox())!;
@@ -137,9 +128,7 @@ test("invite page shows a preview and asks a signed-out visitor to sign in", asy
   const ownerPage = await owner.newPage();
   await ownerPage.goto("/login");
   await ownerPage.getByRole("button", { name: "Dev login" }).click();
-  await ownerPage.getByPlaceholder("New list name").fill(listName);
-  await ownerPage.getByRole("button", { name: "Create" }).click();
-  await ownerPage.getByRole("link", { name: new RegExp(listName) }).click();
+  await createAndOpenList(ownerPage, listName);
   await ownerPage.getByRole("button", { name: /Invite someone/ }).click();
   const inviteDialog = ownerPage.getByRole("dialog", { name: "Invite someone" });
   const url = await inviteDialog.locator("input[readonly]").inputValue();
