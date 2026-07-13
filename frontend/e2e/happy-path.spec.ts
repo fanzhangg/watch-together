@@ -54,11 +54,16 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
     page.locator(".movie.is-watched").filter({ hasText: "The Matrix" }),
   ).toBeVisible();
 
-  // --- invite link ---
+  // --- invite link (opens in a modal) ---
   await page.getByRole("button", { name: /Invite someone/ }).click();
-  const link = page.locator('input[readonly]');
-  await expect(link).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Invite someone" });
+  await expect(dialog).toBeVisible();
+  const link = dialog.locator("input[readonly]");
   await expect(link).toHaveValue(/\/invite\/.+/);
+  await expect(dialog.getByRole("button", { name: "Copy link" })).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden();
 
   // --- clean up ---
   page.once("dialog", (d) => d.accept());
@@ -81,7 +86,9 @@ test("invite page shows a preview and asks a signed-out visitor to sign in", asy
   await ownerPage.getByRole("button", { name: "Create" }).click();
   await ownerPage.getByRole("link", { name: new RegExp(listName) }).click();
   await ownerPage.getByRole("button", { name: /Invite someone/ }).click();
-  const url = await ownerPage.locator('input[readonly]').inputValue();
+  const inviteDialog = ownerPage.getByRole("dialog", { name: "Invite someone" });
+  const url = await inviteDialog.locator("input[readonly]").inputValue();
+  await inviteDialog.getByRole("button", { name: "Done" }).click();
 
   // A signed-out visitor opens the link: they see WHAT they're joining,
   // without having to sign in first.

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { posterUrl, type MovieSearchResult } from "../types";
+import Modal from "./Modal";
 
 /** Debounce a value so we don't fire a TMDB search on every keystroke. */
 function useDebounced<T>(value: T, ms: number): T {
@@ -27,19 +28,6 @@ export default function MovieSearchDialog({
   const [query, setQuery] = useState("");
   const debounced = useDebounced(query.trim(), 300);
 
-  // Close on Escape.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  // Stop the page scrolling behind the sheet (very noticeable on mobile).
-  useEffect(() => {
-    document.body.classList.add("no-scroll");
-    return () => document.body.classList.remove("no-scroll");
-  }, []);
-
   const { data: results, isFetching, error } = useQuery<MovieSearchResult[]>({
     queryKey: ["tmdb", debounced],
     queryFn: () => api.searchMovies(debounced),
@@ -52,13 +40,8 @@ export default function MovieSearchDialog({
   });
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Add a movie"
-      >
+    <Modal variant="sheet" label="Add a movie" onClose={onClose}>
+      <>
         <div className="dialog-head">
           <input
             type="search"
@@ -121,7 +104,7 @@ export default function MovieSearchDialog({
             );
           })}
         </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   );
 }

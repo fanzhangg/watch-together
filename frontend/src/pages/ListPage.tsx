@@ -102,7 +102,7 @@ export default function ListPage() {
           >
             + Add movie
           </button>
-          <InviteButton listId={id} />
+          <InviteButton listId={id} listName={list?.name} />
         </div>
       </div>
 
