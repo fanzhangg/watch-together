@@ -1,4 +1,5 @@
 import { devices, expect, test } from "@playwright/test";
+import { deleteOpenList } from "./helpers";
 
 // Emulates a real phone (viewport + touch + mobile UA), not just a narrow window.
 // Pixel 5 rather than an iPhone because its default engine is Chromium — the one
@@ -64,8 +65,6 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
   const scrollW = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollW).toBeLessThanOrEqual(viewport.width + 1);
 
-  // cleanup
-  page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Delete list" }).tap();
-  await expect(page.getByRole("heading", { name: "Your lists" })).toBeVisible();
+  // cleanup — delete via the "⋯" menu and the confirm dialog
+  await deleteOpenList(page);
 });

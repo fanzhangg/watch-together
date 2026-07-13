@@ -64,8 +64,15 @@ a { color: inherit; }
   text-decoration: none;
   font-size: 1.05rem;
 }
-/* --- avatar + profile menu --- */
-.user-menu { position: relative; flex: none; }
+/* --- dropdown menus (header avatar, list "⋯") --- */
+.menu-anchor { position: relative; flex: none; }
+
+.more-btn {
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.5rem 0.7rem;
+  color: var(--muted);
+}
 
 .avatar-btn {
   padding: 3px;
@@ -126,6 +133,22 @@ a { color: inherit; }
   text-align: left;
   border-color: transparent;
   background: transparent;
+}
+.menu-item.danger { color: #d64545; }
+
+/* Solid destructive button — used to confirm a delete. */
+button.destructive {
+  background: #d64545;
+  border-color: #d64545;
+  color: #fff;
+  font-weight: 550;
+}
+@media (hover: hover) {
+  button.destructive:hover:not(:disabled) {
+    filter: brightness(1.08);
+    background: #d64545;
+  }
+  .menu-item.danger:hover:not(:disabled) { background: #d6454518; color: #d64545; }
 }
 
 .container {
@@ -386,13 +409,6 @@ input:focus-visible, button:focus-visible {
 .divider { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.8rem; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-/* Destructive actions live at the bottom, away from what you tap every day. */
-.danger-zone {
-  margin-top: 3.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-}
-
 /* Floating "add movie" button — mobile only, so adding is always one thumb-tap
    away instead of a scroll back to the top. */
 .fab {
@@ -430,8 +446,12 @@ input:focus-visible, button:focus-visible {
 
   .page-head { flex-direction: column; align-items: stretch; gap: 0.9rem; }
   .page-head h1 { font-size: 1.45rem; }
-  .actions { flex-direction: column; align-items: stretch; }
-  .actions > * , .actions button { width: 100%; }
+  /* "+ Add movie" is hidden on mobile (the FAB replaces it), leaving Invite to
+     take the row with the "⋯" menu tucked beside it. */
+  .actions { flex-direction: row; align-items: stretch; gap: 0.5rem; }
+  .actions .invite-btn { flex: 1; }
+  .actions .menu-anchor { flex: none; width: auto; }
+  .more-btn { width: auto; min-width: 44px; }
 
   .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .movie-body { padding: 0.55rem 0.6rem 0.6rem; }

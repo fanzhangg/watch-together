@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { deleteOpenList } from "./helpers";
 
 /**
  * The M5 happy path, driven through the real UI in a browser:
@@ -65,10 +66,10 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect(dialog).toBeHidden();
 
-  // --- clean up ---
-  page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Delete list" }).click();
-  await expect(page.getByRole("heading", { name: "Your lists" })).toBeVisible();
+  // --- delete, via the "⋯" menu + confirm dialog ---
+  // Deletion must not be reachable without opening the menu.
+  await expect(page.getByRole("menuitem", { name: "Delete list" })).toHaveCount(0);
+  await deleteOpenList(page);
   await expect(page.getByRole("link", { name: new RegExp(listName) })).toHaveCount(0);
 });
 
@@ -132,8 +133,7 @@ test("invite page shows a preview and asks a signed-out visitor to sign in", asy
   await expect(visitorPage.getByRole("button", { name: "Sign in to join" })).toBeVisible();
 
   // cleanup
-  ownerPage.once("dialog", (d) => d.accept());
-  await ownerPage.getByRole("button", { name: "Delete list" }).click();
+  await deleteOpenList(ownerPage);
   await owner.close();
   await visitor.close();
 });

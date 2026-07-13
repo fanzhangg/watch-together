@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import { useLogout } from "../auth";
 import type { User } from "../types";
+import DropdownMenu from "./DropdownMenu";
 
 function initials(user: User): string {
   const name = user.display_name?.trim();
@@ -38,40 +38,16 @@ function Avatar({ user, size }: { user: User; size: number }) {
 
 /** Avatar button in the header that opens a profile menu (with Sign out). */
 export default function UserMenu({ user }: { user: User }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const logout = useLogout();
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <div className="user-menu" ref={ref}>
-      <button
-        className="avatar-btn"
-        aria-label="Account menu"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <Avatar user={user} size={34} />
-      </button>
-
-      {open && (
-        <div className="menu-popover" role="menu">
+    <DropdownMenu
+      label="Account menu"
+      triggerClassName="avatar-btn"
+      trigger={<Avatar user={user} size={34} />}
+    >
+      {() => (
+        <>
           <div className="menu-header">
             <Avatar user={user} size={40} />
             <div className="menu-identity">
@@ -92,8 +68,8 @@ export default function UserMenu({ user }: { user: User }) {
           >
             {logout.isPending ? "Signing out…" : "Sign out"}
           </button>
-        </div>
+        </>
       )}
-    </div>
+    </DropdownMenu>
   );
 }

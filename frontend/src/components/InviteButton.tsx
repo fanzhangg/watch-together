@@ -53,7 +53,9 @@ export default function InviteButton({
 
   return (
     <>
-      <button onClick={openDialog}>🔗 Invite someone</button>
+      <button className="invite-btn" onClick={openDialog}>
+        🔗 Invite someone
+      </button>
 
       {open && (
         <Modal label="Invite someone" onClose={() => setOpen(false)}>

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import DropdownMenu from "../components/DropdownMenu";
 import InviteButton from "../components/InviteButton";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
@@ -12,6 +14,7 @@ export default function ListPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const itemsKey = ["items", id];
 
@@ -103,6 +106,26 @@ export default function ListPage() {
             + Add movie
           </button>
           <InviteButton listId={id} listName={list?.name} />
+          {list?.role === "owner" && (
+            <DropdownMenu
+              label="List options"
+              triggerClassName="more-btn"
+              trigger="⋯"
+            >
+              {(close) => (
+                <button
+                  className="menu-item danger"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    setConfirmDelete(true);
+                  }}
+                >
+                  Delete list
+                </button>
+              )}
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -158,20 +181,15 @@ export default function ListPage() {
         </>
       )}
 
-      {list?.role === "owner" && (
-        <div className="danger-zone">
-          <button
-            className="ghost danger"
-            onClick={() => {
-              if (confirm(`Delete “${list.name}” and all its movies?`)) {
-                deleteList.mutate();
-              }
-            }}
-            disabled={deleteList.isPending}
-          >
-            Delete list
-          </button>
-        </div>
+      {confirmDelete && list && (
+        <ConfirmDialog
+          title={`Delete “${list.name}”?`}
+          body="This removes the list and all its movies for everyone in it. This can’t be undone."
+          confirmLabel="Delete list"
+          busy={deleteList.isPending}
+          onConfirm={() => deleteList.mutate()}
+          onCancel={() => setConfirmDelete(false)}
+        />
       )}
 
       {/* Mobile: adding a movie is always one thumb-tap away. */}
