@@ -1,5 +1,11 @@
 export type Status = "want_to_watch" | "watched";
 
+/** Runtime config from the backend — which sign-in methods this deployment has. */
+export interface AppConfig {
+  google_client_id: string | null;
+  dev_login: boolean;
+}
+
 export interface User {
   id: string;
   email: string;

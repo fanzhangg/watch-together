@@ -44,10 +44,18 @@ class Settings(BaseSettings):
 
     # --- App ---------------------------------------------------------------
     # Public base URL used to build share links, e.g. https://host/invite/<code>.
-    # In production the SPA and API share an origin, so the request's own base
-    # URL is right; in dev the SPA is on :5173 while the API is on :8000, so set
+    # In dev the SPA is on :5173 while the API is on :8000, so set
     # APP_BASE_URL=http://localhost:5173 to get clickable invite links.
     app_base_url: str = ""
+    # Render injects this automatically (https://<service>.onrender.com), so
+    # production gets correct https invite links with no manual configuration.
+    render_external_url: str = ""
+
+    @property
+    def public_base_url(self) -> str:
+        """Explicit config wins, then Render's own URL; empty means 'use the
+        request's origin' (correct when the SPA and API share one)."""
+        return self.app_base_url or self.render_external_url
 
     @property
     def database_url(self) -> str:

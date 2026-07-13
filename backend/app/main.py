@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, health, invites, items, lists, tmdb
+from app.routers import auth, config, health, invites, items, lists, tmdb
 
 # Vite builds into this directory (see frontend/vite.config.ts). It is absent
 # in local backend-only dev and in tests — the app still serves /api fine.
@@ -24,6 +24,7 @@ app = FastAPI(title="Watch-Together API")
 
 # --- API routes (registered first) ---------------------------------------
 app.include_router(health.router)
+app.include_router(config.router)
 app.include_router(auth.router)
 app.include_router(lists.router)
 app.include_router(items.router)

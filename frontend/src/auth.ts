@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "./api";
-import type { User } from "./types";
+import type { AppConfig, User } from "./types";
+
+/** Which sign-in methods this deployment offers. Fetched at runtime, so one
+ *  built image works in every environment. */
+export function useConfig() {
+  return useQuery<AppConfig>({
+    queryKey: ["config"],
+    queryFn: api.config,
+    staleTime: Infinity,
+  });
+}
 
 /** Current user, or null when signed out. A 401 is an answer, not an error. */
 export function useMe() {

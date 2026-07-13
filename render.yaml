@@ -1,6 +1,9 @@
-# Render infra-as-code. Single Docker web service (builds the frontend and runs
-# the FastAPI backend that serves it). Postgres lives on Neon, so DATABASE_URL
-# and secrets are set manually in the Render dashboard (sync: false).
+# Render infra-as-code. A single Docker web service builds the frontend and runs
+# the FastAPI backend that serves it (one origin, no CORS). Postgres lives on
+# Neon, so DB_URL and the secrets are set in the Render dashboard (sync: false).
+#
+# Render injects RENDER_EXTERNAL_URL automatically, which the app uses to build
+# https invite links — nothing to configure by hand.
 services:
   - type: web
     name: watch-together
@@ -9,15 +12,21 @@ services:
     plan: starter # ~$7/mo, always-on (no cold starts)
     healthCheckPath: /api/health
     envVars:
-      - key: DB_URL # Neon pooled connection string
+      # Neon POOLED connection string (the host contains "-pooler").
+      - key: DB_URL
         sync: false
-      - key: SESSION_SECRET
-        generateValue: true
+      # Google OAuth client id — without this, nobody can sign in, because
+      # DEV_LOGIN is off in production.
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: TMDB_API_KEY
         sync: false
+      # Generated once by Render and kept; rotating it signs everyone out.
+      - key: SESSION_SECRET
+        generateValue: true
+      # The local-only login bypass MUST stay off in production.
       - key: DEV_LOGIN
         value: "false"
+      # Session cookie only over HTTPS.
       - key: SESSION_COOKIE_SECURE
         value: "true"

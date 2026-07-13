@@ -23,6 +23,15 @@ class GoogleLoginIn(BaseModel):
     credential: str
 
 
+class ConfigOut(BaseModel):
+    """Public, non-secret runtime config the SPA needs to render the login page."""
+
+    # Null when no OAuth client is configured -> no Google button.
+    google_client_id: str | None = None
+    # False in production -> the login page must not offer the dev bypass.
+    dev_login: bool = False
+
+
 # --- Lists ---------------------------------------------------------------
 class ListCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)

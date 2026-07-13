@@ -39,16 +39,18 @@ function loadGsi(): Promise<void> {
 /**
  * Renders the official "Sign in with Google" button.
  *
- * Only shown when VITE_GOOGLE_CLIENT_ID is configured — until then the app is
- * fully usable via dev login, so an unconfigured OAuth client never blocks work.
+ * The client id comes from the backend at runtime (GET /api/config), not from a
+ * VITE_* build variable — so the same built image works in every environment and
+ * changing the OAuth client is a restart, not a rebuild.
  */
 export default function GoogleSignInButton({
+  clientId,
   onCredential,
 }: {
+  clientId: string | null;
   onCredential: (credential: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   useEffect(() => {
     if (!clientId || !ref.current) return;

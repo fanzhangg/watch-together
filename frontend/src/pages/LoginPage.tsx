@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { useMe } from "../auth";
+import { useConfig, useMe } from "../auth";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import type { User } from "../types";
 
@@ -10,7 +10,8 @@ interface LocationState {
 }
 
 export default function LoginPage() {
-  const { data: user, isPending } = useMe();
+  const { data: user, isPending: userPending } = useMe();
+  const { data: config, isPending: configPending } = useConfig();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,10 +29,16 @@ export default function LoginPage() {
     onSuccess: onSignedIn,
   });
 
-  if (isPending) return <p className="container muted">Loading…</p>;
+  if (userPending || configPending) {
+    return <p className="container muted">Loading…</p>;
+  }
   if (user) return <Navigate to={next} replace />;
 
   const error = googleLogin.error ?? devLogin.error;
+  // Only offer what this deployment actually supports: in production DEV_LOGIN
+  // is off, so the dev button must not appear (it would 404).
+  const showGoogle = !!config?.google_client_id;
+  const showDevLogin = !!config?.dev_login;
 
   return (
     <div className="center-card">
@@ -41,20 +48,36 @@ export default function LoginPage() {
       <div className="stack">
         {error && <div className="error">{(error as Error).message}</div>}
 
-        <GoogleSignInButton onCredential={(c) => googleLogin.mutate(c)} />
+        {showGoogle && (
+          <GoogleSignInButton
+            clientId={config!.google_client_id}
+            onCredential={(c) => googleLogin.mutate(c)}
+          />
+        )}
 
-        {import.meta.env.VITE_GOOGLE_CLIENT_ID && <div className="divider">or</div>}
+        {showGoogle && showDevLogin && <div className="divider">or</div>}
 
-        <button
-          className="primary"
-          onClick={() => devLogin.mutate()}
-          disabled={devLogin.isPending}
-        >
-          {devLogin.isPending ? "Signing in…" : "Dev login"}
-        </button>
-        <p style={{ fontSize: "0.8rem" }}>
-          Dev login works when the backend runs with <code>DEV_LOGIN=true</code>.
-        </p>
+        {showDevLogin && (
+          <>
+            <button
+              className={showGoogle ? "" : "primary"}
+              onClick={() => devLogin.mutate()}
+              disabled={devLogin.isPending}
+            >
+              {devLogin.isPending ? "Signing in…" : "Dev login"}
+            </button>
+            <p style={{ fontSize: "0.8rem" }} className="muted">
+              Local development only.
+            </p>
+          </>
+        )}
+
+        {!showGoogle && !showDevLogin && (
+          <div className="error">
+            No sign-in method is configured. Set <code>GOOGLE_CLIENT_ID</code> on
+            the server.
+          </div>
+        )}
       </div>
     </div>
   );

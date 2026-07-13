@@ -35,4 +35,6 @@ COPY --from=frontend /backend/app/web ./app/web
 ENV PORT=8000
 EXPOSE 8000
 # Apply migrations, then serve the API and the SPA on one origin.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# --proxy-headers: Render terminates TLS, so without honouring X-Forwarded-Proto
+# the app thinks it is on http:// and would emit http:// invite links.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]

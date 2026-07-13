@@ -31,10 +31,17 @@ router = APIRouter(prefix="/api/invites", tags=["invites"])
 
 
 def _invite_url(request: Request, settings: Settings, code: str) -> str:
-    """Build the share link. Prefer APP_BASE_URL (needed in dev, where the SPA
-    is on :5173 and this API is on :8000); otherwise use the request's origin,
-    which is correct in production where they share one."""
-    base = settings.app_base_url or str(request.base_url)
+    """Build the share link.
+
+    Prefers an explicitly configured base URL — needed in dev (SPA on :5173,
+    API on :8000) and on Render (which injects RENDER_EXTERNAL_URL). Falls back
+    to the request's own origin, which is right when the SPA and API share one.
+
+    The fallback relies on uvicorn running with --proxy-headers so that
+    X-Forwarded-Proto is honoured; without it, a TLS-terminating proxy would
+    make us emit http:// links for an https:// site.
+    """
+    base = settings.public_base_url or str(request.base_url)
     return f"{base.rstrip('/')}/invite/{code}"
 
 

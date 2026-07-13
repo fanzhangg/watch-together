@@ -2,6 +2,7 @@
 // same origin in prod too), so the session cookie is sent automatically.
 
 import type {
+  AppConfig,
   Invite,
   InvitePreview,
   Item,
@@ -48,6 +49,9 @@ const post = (body?: unknown): RequestInit => ({
 });
 
 export const api = {
+  // --- runtime config ---
+  config: () => request<AppConfig>("/api/config"),
+
   // --- auth ---
   me: () => request<User>("/api/auth/me"),
   devLogin: () => request<User>("/api/auth/dev-login", post()),
