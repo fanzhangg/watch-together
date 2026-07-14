@@ -435,7 +435,7 @@ input:focus-visible, button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  width: 280px;
+  width: 340px;
   max-width: 100%;
   height: 48px;
   padding: 0 1.1rem;
@@ -446,7 +446,7 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
 .watch-date {
   font-weight: 550;
   background: var(--surface);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--border);
 }
 .watch-date input[type="date"] {
   font: inherit;
