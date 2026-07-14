@@ -435,7 +435,10 @@ input:focus-visible, button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  width: 340px;
+  /* Both states share this width, so the floor is whatever the date picker's
+     contents need (~272px) — much below that and the picker, not the button,
+     would push the row wider. */
+  width: 300px;
   max-width: 100%;
   height: 48px;
   padding: 0 1.1rem;
