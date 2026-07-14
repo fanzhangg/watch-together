@@ -58,14 +58,14 @@ test("mobile: add a movie via the floating button, sheet doesn't scroll the page
     .first();
   await expect(movie).toBeVisible();
 
-  // The card carries no controls at all — it's one big tap target that opens the
-  // movie, which is where marking it watched lives.
-  await expect(movie.getByRole("button")).toHaveCount(0);
-  await movie.getByRole("link").tap();
-  await page.getByRole("button", { name: "✓ Mark watched today" }).tap();
-  await expect(page.getByLabel("Watch date")).toBeVisible();
+  // The tick overlays the poster, so it doesn't inherit the row buttons' sizing
+  // for free — assert it's still a comfortable tap target.
+  const tick = movie.getByRole("button", { name: "Mark The Matrix watched" });
+  const tickBox = (await tick.boundingBox())!;
+  expect(tickBox.height).toBeGreaterThanOrEqual(44);
+  expect(tickBox.width).toBeGreaterThanOrEqual(44);
 
-  await page.getByRole("link", { name: new RegExp(listName) }).tap();
+  await tick.tap();
   await expect(
     page
       .locator(".movie.is-watched")

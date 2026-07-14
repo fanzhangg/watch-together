@@ -294,6 +294,35 @@ input:focus-visible, button:focus-visible {
 }
 .movie { transition: transform 0.12s ease; }
 
+/* One tap: mark this poster watched, today. A sibling of the link rather than a
+   child of it, so it isn't a tap target nested inside a tap target. */
+.watch-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #fff;
+  background: rgb(0 0 0 / 0.5);
+  border-color: rgb(255 255 255 / 0.55);
+  border-radius: 50%;
+  backdrop-filter: blur(4px);
+}
+@media (hover: hover) {
+  .watch-btn:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+}
+
 .poster {
   aspect-ratio: 2 / 3;
   width: 100%;
@@ -587,6 +616,9 @@ input:focus-visible, button:focus-visible {
 
   .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .movie-title { font-size: 0.86rem; }
+  /* Round, and a comfortable tap target — the global min-height would stretch
+     it into a lozenge over the poster. */
+  .watch-btn { width: 44px; height: 44px; min-height: 44px; }
   /* Narrower cards: shrink the stamp so it doesn't swallow the poster. */
   .watch-stamp { width: 66px; height: 66px; padding: 0.45rem; }
   .movie-watched { font-size: 0.47rem; }

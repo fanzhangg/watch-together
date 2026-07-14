@@ -40,12 +40,8 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
     .first();
   await expect(movie).toBeVisible();
 
-  // --- the card is a pure link: every action on a movie is on its detail page ---
-  await expect(movie.getByRole("button")).toHaveCount(0);
-  await movie.getByRole("link").click();
-  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
-  await expect(page.getByLabel("Watch date")).toBeVisible();
-  await page.getByRole("link", { name: new RegExp(listName) }).click();
+  // --- one tap on the card's tick marks it watched (optimistic) ---
+  await movie.getByRole("button", { name: "Mark The Matrix watched" }).click();
 
   await expect(page.getByRole("heading", { name: /^Watched/ })).toBeVisible();
   const watchedCard = page
@@ -66,6 +62,10 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
     }),
   );
   await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
+
+  // Once watched, the card carries no control at all — the stamp says it, and
+  // unwatching lives on the detail page.
+  await expect(watchedCard.getByRole("button")).toHaveCount(0);
 
   // Survives a reload — it was really persisted, not just optimistic UI.
   await page.reload();

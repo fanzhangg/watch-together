@@ -9,7 +9,7 @@ import InviteButton from "../components/InviteButton";
 import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
-import type { Item, ListDetail } from "../types";
+import { todayISO, type Item, type ListDetail } from "../types";
 
 export default function ListPage() {
   const { id = "" } = useParams();
@@ -28,6 +28,30 @@ export default function ListPage() {
   const { data: items, isPending } = useQuery<Item[]>({
     queryKey: itemsKey,
     queryFn: () => api.getItems(id),
+  });
+
+  // One tap on a poster marks it watched, today. Optimistic: flip it in the
+  // cache immediately and roll back on failure. watched_on has to move with the
+  // status — the card stamps the date onto the poster, so leaving it for the
+  // refetch would flash a watched card with no stamp.
+  const markWatched = useMutation({
+    mutationFn: (item: Item) => api.markWatched(id, item.id),
+    onMutate: async (item) => {
+      await qc.cancelQueries({ queryKey: itemsKey });
+      const previous = qc.getQueryData<Item[]>(itemsKey);
+      qc.setQueryData<Item[]>(itemsKey, (old) =>
+        old?.map((i) =>
+          i.id === item.id
+            ? { ...i, status: "watched" as const, watched_on: todayISO() }
+            : i,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _item, ctx) => {
+      if (ctx?.previous) qc.setQueryData(itemsKey, ctx.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: itemsKey }),
   });
 
   const renameList = useMutation({
@@ -153,7 +177,12 @@ export default function ListPage() {
           <h2 className="section-title">Want to watch</h2>
           <div className="movie-grid">
             {want.map((item) => (
-              <MovieCard key={item.id} item={item} listId={id} />
+              <MovieCard
+                key={item.id}
+                item={item}
+                listId={id}
+                onWatch={() => markWatched.mutate(item)}
+              />
             ))}
           </div>
         </>
@@ -163,6 +192,8 @@ export default function ListPage() {
         <>
           <h2 className="section-title">Watched</h2>
           <div className="movie-grid">
+            {/* No onWatch: a watched card has no control. Unwatching is on the
+                detail page. */}
             {watched.map((item) => (
               <MovieCard key={item.id} item={item} listId={id} />
             ))}
