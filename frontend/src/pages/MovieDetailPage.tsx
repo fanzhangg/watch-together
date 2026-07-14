@@ -131,11 +131,15 @@ export default function MovieDetailPage() {
 
           {/* The point of the page: when did we watch it. One control says it —
               the date picker IS the watch date, so a formatted copy of it above
-              would just be the same fact twice. Everything destructive or rarer
-              (unwatch, remove) sits in the menu beside it. */}
-          <section className={`watch-panel${watched ? " is-watched" : ""}`}>
+              would just be the same fact twice. The menu sits BESIDE that
+              control, as a sibling, not wrapped around it.
+
+              Both states of the control share one fixed footprint (.watch-control),
+              so marking a movie watched swaps the button for the date picker
+              without the row changing size under the cursor. */}
+          <section className="watch-panel">
             {watched && item.watched_on ? (
-              <label className="watch-date">
+              <label className="watch-control watch-date">
                 <span>Watched on</span>
                 <input
                   type="date"
@@ -148,7 +152,7 @@ export default function MovieDetailPage() {
               </label>
             ) : (
               <button
-                className="primary"
+                className="primary watch-control"
                 onClick={() => markWatched.mutate()}
                 disabled={markWatched.isPending}
               >
@@ -158,7 +162,7 @@ export default function MovieDetailPage() {
 
             <DropdownMenu
               label="Movie options"
-              triggerClassName="more-btn"
+              triggerClassName="more-btn watch-more"
               trigger="⋯"
             >
               {(close) => (

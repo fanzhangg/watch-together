@@ -414,19 +414,40 @@ input:focus-visible, button:focus-visible {
 .detail-credit .muted { margin-right: 0.5rem; }
 
 /* The reason the page exists: one control for the watch date, with the rarer
-   and destructive actions (unwatch, remove) tucked into the menu beside it. */
+   and destructive actions (unwatch, remove) in the menu BESIDE it — a sibling,
+   not a wrapper. */
 .watch-panel {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   align-self: start;
-  padding: 0.85rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
+}
+
+/* Both states of the control — the button and the date picker that replaces it —
+   share one footprint, so marking a movie watched doesn't resize the row under
+   the cursor that just clicked it. A fixed width, not a min-width: the date
+   picker's contents are wider than the button's label and would otherwise push
+   past it. (On mobile the panel stretches and both states flex to the same
+   available width, so this is a desktop concern only.) */
+.watch-control {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 280px;
+  max-width: 100%;
+  height: 48px;
+  padding: 0 1.1rem;
   border-radius: var(--radius);
 }
-.watch-panel.is-watched { border-color: var(--accent); }
-.watch-date { display: flex; align-items: center; gap: 0.6rem; font-weight: 550; }
+button.watch-control { font-size: 1rem; font-weight: 550; }
+
+.watch-date {
+  font-weight: 550;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+}
 .watch-date input[type="date"] {
   font: inherit;
   font-weight: 400;
@@ -434,8 +455,22 @@ input:focus-visible, button:focus-visible {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.4rem 0.55rem;
+  padding: 0.35rem 0.5rem;
   color-scheme: light dark;
+}
+
+/* Square, and the same height as the control it sits next to — the shared
+   .more-btn is sized for a header row and comes out lopsided here. */
+.watch-more {
+  box-sizing: border-box;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 /* --- empty state --- */

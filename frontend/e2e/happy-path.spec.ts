@@ -153,8 +153,19 @@ test("unwatch and remove live in the detail page's ⋯ menu", async ({ page }) =
   // Destructive actions are never loose on the page.
   await expect(page.getByRole("button", { name: "Remove from list" })).toHaveCount(0);
 
+  // Marking it watched swaps the button for the date picker — the control must
+  // keep the same footprint, or the row resizes under the cursor that clicked it.
+  const control = page.locator(".watch-control");
+  const before = (await control.boundingBox())!;
+  const more = (await page.getByRole("button", { name: "Movie options" }).boundingBox())!;
+  expect(Math.round(more.height)).toBe(Math.round(before.height)); // side by side, same height
+
   await page.getByRole("button", { name: "✓ Mark watched today" }).click();
   await expect(page.getByLabel("Watch date")).toBeVisible();
+
+  const after = (await control.boundingBox())!;
+  expect(Math.round(after.width)).toBe(Math.round(before.width));
+  expect(Math.round(after.height)).toBe(Math.round(before.height));
 
   // Unwatch, from the menu.
   await page.getByRole("button", { name: "Movie options" }).click();
