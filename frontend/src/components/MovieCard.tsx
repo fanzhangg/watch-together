@@ -1,26 +1,6 @@
 import { Link } from "react-router-dom";
 import { formatWatchedDate, posterUrl, type Item } from "../types";
-
-/** Drawn rather than an 👁 emoji: emoji rendering varies wildly per platform and
- *  can't take the button's colour. This inherits currentColor. */
-function EyeIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z" />
-      <circle cx="12" cy="12" r="3.2" />
-    </svg>
-  );
-}
+import EyeIcon from "./EyeIcon";
 
 /**
  * The poster — and, once watched, the date stamped across it like a postmark.

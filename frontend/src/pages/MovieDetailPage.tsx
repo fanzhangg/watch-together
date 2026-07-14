@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import DropdownMenu from "../components/DropdownMenu";
+import EyeIcon from "../components/EyeIcon";
 import {
   posterUrl,
   todayISO,
@@ -156,7 +157,8 @@ export default function MovieDetailPage() {
                 onClick={() => markWatched.mutate()}
                 disabled={markWatched.isPending}
               >
-                ✓ Mark watched today
+                <EyeIcon />
+                Mark watched today
               </button>
             )}
 

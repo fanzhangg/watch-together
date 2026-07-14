@@ -113,7 +113,7 @@ test("open a movie, correct the date we actually watched it", async ({ page }) =
   // --- the card is a link to the detail page, where it gets marked watched ---
   await card.getByRole("link").click();
   await expect(page.getByRole("heading", { name: "The Matrix" })).toBeVisible();
-  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
+  await page.getByRole("button", { name: "Mark watched today" }).click();
   await expect(page.getByLabel("Watch date")).toBeVisible();
   // Live TMDB metadata the DB snapshot doesn't hold.
   await expect(page.getByText("Keanu Reeves")).toBeVisible({ timeout: 15_000 });
@@ -148,7 +148,7 @@ test("unwatch and remove live in the detail page's ⋯ menu", async ({ page }) =
   await page.getByRole("link", { name: "The Matrix" }).click();
 
   // Unwatched: one button, no "not watched yet" restatement of it.
-  await expect(page.getByRole("button", { name: "✓ Mark watched today" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mark watched today" })).toBeVisible();
   await expect(page.getByText("Not watched yet")).toHaveCount(0);
   // Destructive actions are never loose on the page.
   await expect(page.getByRole("button", { name: "Remove from list" })).toHaveCount(0);
@@ -160,7 +160,7 @@ test("unwatch and remove live in the detail page's ⋯ menu", async ({ page }) =
   const more = (await page.getByRole("button", { name: "Movie options" }).boundingBox())!;
   expect(Math.round(more.height)).toBe(Math.round(before.height)); // side by side, same height
 
-  await page.getByRole("button", { name: "✓ Mark watched today" }).click();
+  await page.getByRole("button", { name: "Mark watched today" }).click();
   await expect(page.getByLabel("Watch date")).toBeVisible();
 
   const after = (await control.boundingBox())!;
@@ -170,7 +170,7 @@ test("unwatch and remove live in the detail page's ⋯ menu", async ({ page }) =
   // Unwatch, from the menu.
   await page.getByRole("button", { name: "Movie options" }).click();
   await page.getByRole("menuitem", { name: "↩ Mark unwatched" }).click();
-  await expect(page.getByRole("button", { name: "✓ Mark watched today" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mark watched today" })).toBeVisible();
 
   // Remove, from the menu — via a confirm, then back to the list.
   await page.getByRole("button", { name: "Movie options" }).click();

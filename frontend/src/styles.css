@@ -397,11 +397,11 @@ input:focus-visible, button:focus-visible {
   .back-link:hover { color: var(--text); }
 }
 .detail { display: grid; grid-template-columns: 260px 1fr; gap: 2rem; align-items: start; }
+/* Square, like the posters on the board — the art runs to the edge. */
 .detail-poster {
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;
-  border-radius: var(--radius);
   box-shadow: var(--shadow);
   background: var(--surface-2);
 }
