@@ -631,6 +631,7 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
   .actions .menu-anchor { flex: none; width: auto; }
   .more-btn { width: auto; min-width: 44px; }
 
+  /* Two posters is the floor — see the 410px rule below for the third. */
   .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .movie-title { font-size: 0.86rem; }
   /* Round, and a comfortable tap target — the global min-height would stretch
@@ -668,6 +669,17 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
   .result-info .o { -webkit-line-clamp: 2; }
 
   .center-card { margin: 6vh auto; padding: 1.5rem; }
+}
+
+/* A third poster on the Plus/Max-class phones. 410px is the seam in the
+   hardware: the whole Pro line tops out at 402pt (16 Pro), the Plus and Max ones
+   start at 414pt. That matters because the card is pure poster art — no title
+   text, the artwork carries it — so the constraint is type baked into the
+   poster. A third column on a Pro leaves ~116px, where that type stops reading
+   and the 44px watch button takes over the card; on a Max it leaves ~129px,
+   where posters still look like posters. */
+@media (min-width: 410px) and (max-width: 640px) {
+  .movie-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 380px) {
