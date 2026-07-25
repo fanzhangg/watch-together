@@ -30,6 +30,27 @@ export interface ListDetail extends ListSummary {
   members: Member[];
 }
 
+/** Thumbs up or thumbs down. "No opinion" is the absence of a Rating, not a 0. */
+export type RatingValue = 1 | -1;
+
+/**
+ * One member's verdict on one movie **in this list**. The same film in another
+ * list carries its own, separate verdicts.
+ *
+ * Carries a bare `user_id`: every page that renders these has already loaded
+ * the list's members, so the name and avatar come from there.
+ */
+export interface Rating {
+  user_id: string;
+  value: RatingValue;
+}
+
+/** What a write returns — no user_id, since it can only ever be mine. */
+export interface MyRating {
+  item_id: string;
+  value: RatingValue;
+}
+
 export interface Item {
   id: string;
   tmdb_id: number;
@@ -42,6 +63,11 @@ export interface Item {
   /** "2026-07-12". Null iff status is want_to_watch — the DB guarantees it. */
   watched_on: string | null;
   created_at: string;
+  /**
+   * Verdicts from this list's members only. Independent of `status`: an
+   * unwatched movie can carry them, and un-watching clears none.
+   */
+  ratings: Rating[];
 }
 
 export interface MovieSearchResult {
@@ -106,6 +132,42 @@ export function todayISO(): string {
 export function formatWatchMonth(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString(undefined, {
     month: "long",
+    year: "numeric",
+  });
+}
+
+/** "2026-07-12" -> "12 Jul 2026" — the exact day, for the detail-rich list view.
+ *  The poster grid deliberately shows only the month; a row has space to say
+ *  precisely when. */
+export function formatWatchDate(iso: string): string {
+  return parseLocalDate(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * A `created_at` timestamp from the API -> a local Date.
+ *
+ * Unlike a watch date, this one really IS an instant, so `new Date()` is the
+ * right tool — the warning above is about bare date strings. The catch is
+ * different: SQLite (local dev) round-trips these WITHOUT a timezone suffix,
+ * and a bare "2026-07-25T21:30:00" is parsed as local time rather than UTC,
+ * which moves an evening addition onto the wrong day. Postgres sends the
+ * offset; we supply it when it's missing, exactly as the backend does when
+ * reading invite expiry.
+ */
+export function parseTimestamp(iso: string): Date {
+  const hasZone = /([Zz]|[+-]\d{2}:?\d{2})$/.test(iso);
+  return new Date(hasZone ? iso : `${iso}Z`);
+}
+
+/** "2026-07-25T21:30:00Z" -> "25 Jul 2026" — the day a movie joined the list. */
+export function formatAddedDate(iso: string): string {
+  return parseTimestamp(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
     year: "numeric",
   });
 }

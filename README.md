@@ -10,7 +10,8 @@ them watched / want-to-watch together.
 **Live:** <https://watch-together-4iso.onrender.com> (Render `oregon` + Neon
 `us-west-2`). Sign-in is Google-only in production.
 
-Status: **shipped** — M0–M6 complete. 43 backend tests + 5 Playwright e2e.
+Status: **shipped** — M0–M7 complete, M8 (ratings) in progress. 68 backend
+tests + 5 Playwright e2e.
 
 ## Repo layout
 
@@ -90,6 +91,34 @@ once the backend is up just refresh the page.
 > **Database:** local dev/test defaults to a **SQLite** file (`dev.db`) — zero
 > setup. Run migrations once before logging in: `alembic upgrade head` (creates
 > the `users` table). Production uses Postgres/Neon via `DB_URL`.
+>
+> **Run `alembic upgrade head` again after pulling** — a new milestone usually
+> adds a table, and a dev database that hasn't been migrated gives you a `500`
+> with `no such table` rather than anything helpful. The test suite won't warn
+> you: it builds its schema with `create_all`, not Alembic.
+
+### Being two people at once (local)
+
+Sharing a list, invites, and other people's ratings can't be seen as one user.
+The dev login takes an optional **name**, and each name is a separate, stable
+identity (`fang@local`, `vanadium@local`, …) — so two browser profiles can be
+two different people against the same backend.
+
+1. **Window 1** (normal): open <http://localhost:5173>, type `Fang` in the
+   *"Sign in as…"* box, click **Dev login as Fang**.
+2. Create a list, add a couple of movies, then **Invite** → *Copy link*.
+3. **Window 2** — an **incognito window** or a different browser, so it gets its
+   own cookie jar. A second tab in the same window is still the same person.
+4. Sign in there as `Vanadium`, then paste the invite link and accept.
+5. Both are now in the list. Rate the same movie from each window, and switch
+   the board to **☰** (details and ratings) to see both verdicts side by side.
+
+The name is an identity, not a password — the whole route only exists when
+`DEV_LOGIN=true`, which is never the case in production. From the command line:
+
+```bash
+curl -X POST "http://localhost:8000/api/auth/dev-login?name=Fang" -c fang.cookies
+```
 
 ## Building and running with Docker
 

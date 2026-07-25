@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -17,6 +18,7 @@ from app.models import (
     STATUS_WATCHED,
     Invite,
     List,
+    ItemRating,
     ListItem,
     ListMember,
     User,
@@ -66,16 +68,42 @@ def upsert_user_by_google(
     return user
 
 
-def get_or_create_dev_user(db: Session) -> User:
-    """Return the local dev user, creating it on first use."""
+def _dev_slug(name: str) -> str:
+    """"Fang Zhang" -> "fang-zhang". Stable, so the same name is the same person."""
+    cleaned = [c.lower() if c.isalnum() else "-" for c in name.strip()]
+    return "-".join(filter(None, "".join(cleaned).split("-")))
+
+
+def get_or_create_dev_user(db: Session, name: str | None = None) -> User:
+    """Return a local dev user, creating it on first use.
+
+    With no name, this is the single default dev user. **With a name it's a
+    separate, stable identity** (`dev-login-user-fang` / `fang@local`) — which is
+    how the two-person experience gets driven locally: two browser profiles, two
+    different names, one list shared between them by invite link. Without it
+    every profile signs in as the same person and nothing multi-user can be seen.
+
+    The name is an identity, not a password. This route only exists when
+    DEV_LOGIN is on, which is never true in production.
+    """
+    slug = _dev_slug(name) if name else ""
+    if not slug:
+        sub, email, display = DEV_USER_SUB, DEV_USER_EMAIL, "Dev User"
+    else:
+        sub, email, display = (
+            f"{DEV_USER_SUB}-{slug}",
+            f"{slug}@local",
+            (name or "").strip(),
+        )
+
     user = db.execute(
-        select(User).where(User.google_sub == DEV_USER_SUB)
+        select(User).where(User.google_sub == sub)
     ).scalar_one_or_none()
     if user is None:
         user = User(
-            google_sub=DEV_USER_SUB,
-            email=DEV_USER_EMAIL,
-            display_name="Dev User",
+            google_sub=sub,
+            email=email,
+            display_name=display,
             avatar_url=None,
         )
         db.add(user)
@@ -122,7 +150,11 @@ def get_members(db: Session, list_id: uuid.UUID) -> list[tuple[User, str]]:
         select(User, ListMember.role)
         .join(ListMember, ListMember.user_id == User.id)
         .where(ListMember.list_id == list_id)
-        .order_by(ListMember.joined_at)
+        # user_id breaks ties: SQLite's CURRENT_TIMESTAMP only has second
+        # granularity, so two people who joined in the same second would
+        # otherwise come back in whatever order the database chose that time —
+        # and the member avatars would shuffle between renders.
+        .order_by(ListMember.joined_at, ListMember.user_id)
     ).all()
     return [(user, role) for user, role in rows]
 
@@ -338,4 +370,108 @@ def update_item(
 
 def delete_item(db: Session, item: ListItem) -> None:
     db.delete(item)
+    db.commit()
+
+
+# --- Ratings (M8) --------------------------------------------------------
+def get_rating(
+    db: Session, list_item_id: uuid.UUID, user_id: uuid.UUID
+) -> ItemRating | None:
+    return db.execute(
+        select(ItemRating).where(
+            ItemRating.list_item_id == list_item_id,
+            ItemRating.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+
+
+def ratings_for_list(
+    db: Session,
+    list_id: uuid.UUID,
+    item_ids: Sequence[uuid.UUID] | None = None,
+) -> dict[uuid.UUID, list[ItemRating]]:
+    """Verdicts on this list's movies, keyed by list item.
+
+    A verdict is scoped to the list item, so **the scoping is the foreign key,
+    not this query** — an opinion recorded in another list is not reachable from
+    here even if every filter below were wrong. The `list_members` join is here
+    for two lesser reasons: it orders verdicts by `joined_at`, so they appear in
+    the same order every render instead of whatever the database feels like, and
+    it drops anyone no longer in the list.
+
+    One query for a whole board, never one per item. `item_ids` narrows it for
+    the single-item route.
+    """
+    stmt = (
+        select(ItemRating)
+        .join(ListItem, ListItem.id == ItemRating.list_item_id)
+        .join(
+            ListMember,
+            (ListMember.user_id == ItemRating.user_id)
+            & (ListMember.list_id == ListItem.list_id),
+        )
+        .where(ListItem.list_id == list_id)
+        # Same tiebreak as get_members, so both come out in the same order.
+        .order_by(ListMember.joined_at, ItemRating.user_id)
+    )
+
+    if item_ids is not None:
+        ids = list(item_ids)
+        if not ids:
+            return {}
+        stmt = stmt.where(ItemRating.list_item_id.in_(ids))
+
+    by_item: dict[uuid.UUID, list[ItemRating]] = {}
+    for rating in db.execute(stmt).scalars():
+        by_item.setdefault(rating.list_item_id, []).append(rating)
+    return by_item
+
+
+def set_rating(db: Session, *, user: User, item: ListItem, value: int) -> ItemRating:
+    """Upsert the caller's verdict on a movie in a list.
+
+    SELECT-then-INSERT/UPDATE with an IntegrityError fallback, not an ON CONFLICT
+    upsert: SQLAlchemy has no dialect-neutral form of that and this suite runs on
+    both Postgres and SQLite. Same shape as add_item's race handling.
+
+    Re-sending the verdict you already hold is a no-op and does **not** move
+    `rated_at` — the opinion didn't change, so neither did when you formed it.
+    """
+    existing = get_rating(db, item.id, user.id)
+    if existing is not None:
+        if existing.value != value:
+            existing.value = value
+            existing.rated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(existing)
+        return existing
+
+    rating = ItemRating(list_item_id=item.id, user_id=user.id, value=value)
+    db.add(rating)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost a race with the same user rating from another device/tab.
+        db.rollback()
+        existing = get_rating(db, item.id, user.id)
+        if existing is None:
+            raise
+        existing.value = value
+        existing.rated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    db.refresh(rating)
+    return rating
+
+
+def clear_rating(db: Session, *, user: User, item: ListItem) -> None:
+    """Drop the caller's verdict. Idempotent — clearing an unrated movie is fine,
+    because the client can't always know whether one exists and "it isn't rated"
+    is the requested end state either way."""
+    rating = get_rating(db, item.id, user.id)
+    if rating is None:
+        return
+    db.delete(rating)
     db.commit()

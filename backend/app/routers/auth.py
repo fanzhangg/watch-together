@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app import crud
@@ -62,12 +62,21 @@ def login_google(
 @router.post("/dev-login", response_model=UserOut)
 def dev_login(
     response: Response,
+    name: str | None = Query(
+        default=None,
+        max_length=40,
+        description="Sign in as a named local identity, so a second browser "
+        "profile can be a different person. Omit for the default dev user.",
+    ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> User:
+    """Local bypass. `?name=Fang` gives a separate, stable identity — which is
+    the only way to see anything multi-user (shared lists, invites, other
+    people's verdicts) without two real Google accounts."""
     if not settings.dev_login:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    user = crud.get_or_create_dev_user(db)
+    user = crud.get_or_create_dev_user(db, name)
     _set_session_cookie(response, settings, user)
     return user
 

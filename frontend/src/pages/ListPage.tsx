@@ -2,14 +2,44 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import { useMe } from "../auth";
 import Avatar, { displayName } from "../components/Avatar";
 import ConfirmDialog from "../components/ConfirmDialog";
 import DropdownMenu from "../components/DropdownMenu";
+import DotsIcon from "../components/DotsIcon";
 import InviteButton from "../components/InviteButton";
 import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
+import MovieRow from "../components/MovieRow";
 import MovieSearchDialog from "../components/MovieSearchDialog";
 import { formatWatchMonth, todayISO, type Item, type ListDetail } from "../types";
+
+/**
+ * The board has two readings of the same movies.
+ *
+ * `list` — **the default.** A row per movie carrying the state around it: when
+ * it was wishlisted or watched, what everyone thought, and the controls to say
+ * so. It's the one that answers questions rather than just showing you what's
+ * there, which is why you land on it.
+ * `grid` — posters, nothing else. Faster to scan when you know the artwork and
+ * just want to get to a film, and how you skim the watched months.
+ *
+ * The choice is a viewing preference, not list data, so it lives in
+ * localStorage rather than on the server — it should follow the device, and it
+ * isn't worth a round trip or a column.
+ */
+type BoardView = "grid" | "list";
+const VIEW_KEY = "watch-together:board-view";
+
+function storedView(): BoardView {
+  try {
+    // Only an explicit "grid" opts out — anything else (including never having
+    // touched the toggle) lands on the list.
+    return localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "list";
+  } catch {
+    return "list"; // private mode / storage disabled
+  }
+}
 
 /** A run of watched movies sharing a calendar month, newest month first. */
 interface WatchMonth {
@@ -51,6 +81,16 @@ export default function ListPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [view, setViewState] = useState<BoardView>(storedView);
+
+  const setView = (next: BoardView) => {
+    setViewState(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Not being able to remember the choice is not worth failing over.
+    }
+  };
 
   const itemsKey = ["items", id];
 
@@ -62,6 +102,8 @@ export default function ListPage() {
     queryKey: itemsKey,
     queryFn: () => api.getItems(id),
   });
+  // The list view's quick thumbs need to know which verdict is mine to toggle.
+  const { data: me } = useMe();
 
   // One tap on a poster marks it watched, today. Optimistic: flip it in the
   // cache immediately and roll back on failure. watched_on has to move with the
@@ -146,6 +188,29 @@ export default function ListPage() {
           </div>
         </div>
         <div className="actions">
+          {/* Two readings of the same list — posters to find things, rows to
+              see what everyone thought. */}
+          <div className="view-toggle" role="group" aria-label="Board view">
+            <button
+              className={`view-btn${view === "grid" ? " is-active" : ""}`}
+              aria-pressed={view === "grid"}
+              title="Poster grid"
+              onClick={() => setView("grid")}
+            >
+              <span aria-hidden="true">▦</span>
+              <span className="sr-only">Poster grid</span>
+            </button>
+            <button
+              className={`view-btn${view === "list" ? " is-active" : ""}`}
+              aria-pressed={view === "list"}
+              title="Details and ratings"
+              onClick={() => setView("list")}
+            >
+              <span aria-hidden="true">☰</span>
+              <span className="sr-only">Details and ratings</span>
+            </button>
+          </div>
+
           {/* On mobile this is replaced by the floating button (see .fab). */}
           <button
             className="primary add-movie"
@@ -158,7 +223,7 @@ export default function ListPage() {
             <DropdownMenu
               label="List options"
               triggerClassName="more-btn"
-              trigger="⋯"
+              trigger={<DotsIcon />}
             >
               {(close) => (
                 <>
@@ -209,37 +274,70 @@ export default function ListPage() {
       {want.length > 0 && (
         <>
           <h2 className="section-title">Want to watch</h2>
-          <div className="movie-grid">
-            {want.map((item) => (
-              <MovieCard
-                key={item.id}
-                item={item}
-                listId={id}
-                onWatch={() => markWatched.mutate(item)}
-              />
-            ))}
-          </div>
+          {view === "grid" ? (
+            <div className="movie-grid">
+              {want.map((item) => (
+                <MovieCard
+                  key={item.id}
+                  item={item}
+                  listId={id}
+                  onWatch={() => markWatched.mutate(item)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="movie-rows">
+              {want.map((item) => (
+                <MovieRow
+                  key={item.id}
+                  item={item}
+                  listId={id}
+                  members={list?.members ?? []}
+                  meId={me?.id}
+                  onWatch={() => markWatched.mutate(item)}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
 
       {watched.length > 0 && (
         <>
           <h2 className="section-title">Watched</h2>
-          {/* One grid per month, under its own sub-header — the month is how
-              you find something you watched, and it replaces the date that
-              used to be stamped on every poster. */}
-          {watchedMonths.map((month) => (
-            <section key={month.key} className="watch-month">
-              <h3 className="month-title">{month.label}</h3>
-              <div className="movie-grid">
-                {/* No onWatch: a watched card has no control. Unwatching is on
-                    the detail page. */}
-                {month.items.map((item) => (
-                  <MovieCard key={item.id} item={item} listId={id} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {view === "grid" ? (
+            <>
+              {/* One grid per month, under its own sub-header — the month is how
+                  you find something you watched, and it replaces the date that
+                  used to be stamped on every poster. */}
+              {watchedMonths.map((month) => (
+                <section key={month.key} className="watch-month">
+                  <h3 className="month-title">{month.label}</h3>
+                  <div className="movie-grid">
+                    {/* No onWatch: a watched card has no control. Unwatching is
+                        on the detail page. */}
+                    {month.items.map((item) => (
+                      <MovieCard key={item.id} item={item} listId={id} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </>
+          ) : (
+            /* No month sub-headers here: every row states its own exact date,
+               so the grouping the grid needs would only repeat it. */
+            <div className="movie-rows">
+              {watched.map((item) => (
+                <MovieRow
+                  key={item.id}
+                  item={item}
+                  listId={id}
+                  members={list?.members ?? []}
+                  meId={me?.id}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
 

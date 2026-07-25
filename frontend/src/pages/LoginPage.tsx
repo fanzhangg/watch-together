@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useConfig, useMe } from "../auth";
@@ -27,7 +28,14 @@ export default function LoginPage() {
     navigate(next, { replace: true });
   };
 
-  const devLogin = useMutation({ mutationFn: api.devLogin, onSuccess: onSignedIn });
+  // Naming the dev user is what makes a second browser profile a second
+  // PERSON — without it every profile signs in as the same one and nothing
+  // multi-user (shared lists, invites, someone else's verdict) can be seen.
+  const [devName, setDevName] = useState("");
+  const devLogin = useMutation({
+    mutationFn: () => api.devLogin(devName.trim() || undefined),
+    onSuccess: onSignedIn,
+  });
   const googleLogin = useMutation({
     mutationFn: api.googleLogin,
     onSuccess: onSignedIn,
@@ -63,15 +71,29 @@ export default function LoginPage() {
 
         {showDevLogin && (
           <>
+            <input
+              type="text"
+              value={devName}
+              maxLength={40}
+              placeholder="Sign in as… (optional)"
+              aria-label="Dev login name"
+              onChange={(e) => setDevName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && devLogin.mutate()}
+            />
             <button
               className={showGoogle ? "" : "primary"}
               onClick={() => devLogin.mutate()}
               disabled={devLogin.isPending}
             >
-              {devLogin.isPending ? "Signing in…" : "Dev login"}
+              {devLogin.isPending
+                ? "Signing in…"
+                : devName.trim()
+                  ? `Dev login as ${devName.trim()}`
+                  : "Dev login"}
             </button>
             <p style={{ fontSize: "0.8rem" }} className="muted">
-              Local development only.
+              Local development only. Give a name to sign in as someone else —
+              use a second browser profile to be two people at once.
             </p>
           </>
         )}

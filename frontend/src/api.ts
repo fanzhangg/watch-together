@@ -11,6 +11,8 @@ import {
   type ListSummary,
   type MovieDetail,
   type MovieSearchResult,
+  type MyRating,
+  type RatingValue,
   type User,
 } from "./types";
 
@@ -55,7 +57,14 @@ export const api = {
 
   // --- auth ---
   me: () => request<User>("/api/auth/me"),
-  devLogin: () => request<User>("/api/auth/dev-login", post()),
+  /** Local bypass. A `name` gives a separate stable identity, so a second
+   *  browser profile can be a different person — the only way to exercise
+   *  shared lists and other people's verdicts without two Google accounts. */
+  devLogin: (name?: string) =>
+    request<User>(
+      `/api/auth/dev-login${name ? `?name=${encodeURIComponent(name)}` : ""}`,
+      post(),
+    ),
   googleLogin: (credential: string) =>
     request<User>("/api/auth/google", post({ credential })),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", post()),
@@ -97,6 +106,20 @@ export const api = {
     }),
   deleteItem: (listId: string, itemId: string) =>
     request<void>(`/api/lists/${listId}/items/${itemId}`, { method: "DELETE" }),
+
+  // --- my verdict on a movie in this list ---
+  // Scoped to the list item: rating a film here says nothing about the same
+  // film in another list.
+  setRating: (listId: string, itemId: string, value: RatingValue) =>
+    request<MyRating>(`/api/lists/${listId}/items/${itemId}/rating`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    }),
+  /** Take my verdict back. Safe to call when I haven't rated it. */
+  clearRating: (listId: string, itemId: string) =>
+    request<void>(`/api/lists/${listId}/items/${itemId}/rating`, {
+      method: "DELETE",
+    }),
 
   // --- tmdb ---
   searchMovies: (q: string) =>

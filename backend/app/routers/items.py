@@ -11,11 +11,38 @@ from app import crud
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.deps import ListContext, get_current_user, require_list_member
-from app.models import User
-from app.schemas import ItemCreate, ItemOut, ItemUpdate
+from app.models import ItemRating, ListItem, User
+from app.schemas import (
+    ItemCreate,
+    ItemOut,
+    ItemUpdate,
+    MyRatingOut,
+    RatingIn,
+    RatingOut,
+)
 from app.tmdb import TMDBError, TMDBNotConfigured, TMDBNotFound, get_movie
 
 router = APIRouter(prefix="/api/lists/{list_id}/items", tags=["items"])
+
+
+def _with_ratings(
+    item: ListItem, by_item: dict[uuid.UUID, list[ItemRating]]
+) -> ItemOut:
+    """Attach verdicts to an item.
+
+    Stitched on from one crud.ratings_for_list call rather than loaded per item
+    — a lazy relationship would issue a query per card on the board.
+    """
+    out = ItemOut.model_validate(item)
+    out.ratings = [RatingOut.model_validate(r) for r in by_item.get(item.id, ())]
+    return out
+
+
+def _one_with_ratings(
+    db: Session, list_id: uuid.UUID, item: ListItem
+) -> ItemOut:
+    """Same, for a single item — scoped so it doesn't read the whole board."""
+    return _with_ratings(item, crud.ratings_for_list(db, list_id, [item.id]))
 
 
 @router.get("", response_model=list[ItemOut])
@@ -23,7 +50,10 @@ def get_items(
     ctx: ListContext = Depends(require_list_member),
     db: Session = Depends(get_db),
 ) -> list[ItemOut]:
-    return [ItemOut.model_validate(i) for i in crud.get_items(db, ctx.list.id)]
+    items = crud.get_items(db, ctx.list.id)
+    # One query for the whole board's verdicts, not one per card.
+    by_film = crud.ratings_for_list(db, ctx.list.id)
+    return [_with_ratings(i, by_film) for i in items]
 
 
 @router.post(
@@ -62,7 +92,7 @@ def add_item(
     existing = crud.get_item_by_tmdb(db, ctx.list.id, payload.tmdb_id)
     if existing is not None:
         response.status_code = status.HTTP_200_OK
-        return ItemOut.model_validate(existing)
+        return _one_with_ratings(db, ctx.list.id, existing)
 
     try:
         movie = get_movie(settings.tmdb_api_key, payload.tmdb_id)
@@ -89,7 +119,9 @@ def add_item(
     response.status_code = (
         status.HTTP_201_CREATED if created else status.HTTP_200_OK
     )
-    return ItemOut.model_validate(item)
+    # A new item has no verdicts; a re-added one is a new row, so it has none
+    # either — removing a movie takes the opinions about it with it.
+    return _one_with_ratings(db, ctx.list.id, item)
 
 
 @router.get(
@@ -112,7 +144,7 @@ def get_item(
     item = crud.get_item(db, ctx.list.id, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such item")
-    return ItemOut.model_validate(item)
+    return _one_with_ratings(db, ctx.list.id, item)
 
 
 @router.patch(
@@ -153,7 +185,73 @@ def update_item(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
-    return ItemOut.model_validate(updated)
+    # Verdicts are untouched by a status change — the two facts are independent
+    # (docs/design.md §12). Re-read them so the client's cache stays whole.
+    return _one_with_ratings(db, ctx.list.id, updated)
+
+
+@router.put(
+    "/{item_id}/rating",
+    response_model=MyRatingOut,
+    summary="Set my verdict on this movie",
+    responses={
+        200: {"description": "Verdict recorded (or flipped)"},
+        403: {"description": "Not a member of this list"},
+        404: {"description": "No such item in this list"},
+        422: {"description": "value must be 1 or -1"},
+    },
+)
+def set_rating(
+    item_id: uuid.UUID,
+    payload: RatingIn,
+    ctx: ListContext = Depends(require_list_member),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> MyRatingOut:
+    """Record my thumbs up/down on this movie, in this list.
+
+    The verdict is scoped to the list item, so the same film sitting in another
+    list keeps its own separate verdicts — a thumb is aimed at the people in
+    *this* list, and it stays there.
+
+    **No watched check.** Rating and watch status are independent facts; a thumb
+    on an unwatched film reads as "I'm keen", one on a watched film as "I liked
+    it", and the item's status is what tells them apart.
+    """
+    item = crud.get_item(db, ctx.list.id, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such item")
+
+    rating = crud.set_rating(db, user=user, item=item, value=payload.value)
+    return MyRatingOut(item_id=rating.list_item_id, value=rating.value)
+
+
+@router.delete(
+    "/{item_id}/rating",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Take back my verdict on this movie",
+    responses={
+        204: {
+            "description": "No verdict of mine remains — including when there "
+            "wasn't one to begin with (idempotent)"
+        },
+        403: {"description": "Not a member of this list"},
+        404: {"description": "No such item in this list"},
+    },
+)
+def clear_rating(
+    item_id: uuid.UUID,
+    ctx: ListContext = Depends(require_list_member),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Clears only *my* verdict — a member can never touch anyone else's."""
+    item = crud.get_item(db, ctx.list.id, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such item")
+
+    crud.clear_rating(db, user=user, item=item)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(

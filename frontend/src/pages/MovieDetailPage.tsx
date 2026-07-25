@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import { useMe } from "../auth";
 import ConfirmDialog from "../components/ConfirmDialog";
 import DropdownMenu from "../components/DropdownMenu";
+import DotsIcon from "../components/DotsIcon";
 import EyeIcon from "../components/EyeIcon";
+import RatingControl from "../components/RatingControl";
 import {
   posterUrl,
   todayISO,
@@ -36,6 +39,9 @@ export default function MovieDetailPage() {
     queryKey: ["list", id],
     queryFn: () => api.getList(id),
   });
+  // Verdicts carry a bare user_id; `list.members` is what turns those into
+  // faces, and `me` is how the control knows which one is mine to change.
+  const { data: me } = useMe();
   const {
     data: item,
     isPending,
@@ -110,24 +116,50 @@ export default function MovieDetailPage() {
           <div className="detail-poster placeholder">🎞️</div>
         )}
 
-        <div className="detail-body">
+        {/* What identifies the film, kept separate from what's said about it —
+            on a phone this is the part that sits BESIDE the poster, while the
+            synopsis and the action panel run full width underneath. */}
+        <div className="detail-headline">
           <h1>{item.title}</h1>
 
+          {/* Year, runtime and genres are all the same kind of fact — a label on
+              the film — so they share one wrapping row instead of three stacked
+              blocks. The metadata is here to be glanced at, not read. */}
           <div className="detail-meta">
             {item.release_year && <span>{item.release_year}</span>}
             {detail?.runtime && <span>{runtimeLabel(detail.runtime)}</span>}
+            {detail?.genres.map((genre) => (
+              <span className="chip" key={genre}>
+                {genre}
+              </span>
+            ))}
           </div>
 
           {detail?.tagline && <p className="detail-tagline">“{detail.tagline}”</p>}
+        </div>
 
-          {detail && detail.genres.length > 0 && (
-            <div className="members">
-              {detail.genres.map((genre) => (
-                <span className="chip" key={genre}>
-                  {genre}
-                </span>
-              ))}
-            </div>
+        <div className="detail-body">
+
+          {(detail?.overview ?? item.overview) && (
+            <p className="detail-overview">{detail?.overview ?? item.overview}</p>
+          )}
+
+          {detail?.director && (
+            <p className="detail-credit">
+              <span className="muted">Director</span> {detail.director}
+            </p>
+          )}
+          {detail && detail.cast.length > 0 && (
+            <p className="detail-credit">
+              <span className="muted">Cast</span> {detail.cast.join(", ")}
+            </p>
+          )}
+
+          {!detail && !detailPending && (
+            <p className="muted">
+              Couldn’t reach TMDB for the full details — showing what we saved when
+              this movie was added.
+            </p>
           )}
 
           {/* The point of the page: when did we watch it. One control says it —
@@ -137,8 +169,15 @@ export default function MovieDetailPage() {
 
               Both states of the control share one fixed footprint (.watch-control),
               so marking a movie watched swaps the button for the date picker
-              without the row changing size under the cursor. */}
-          <section className="watch-panel">
+              without the row changing size under the cursor.
+
+              Everything you can DO to this movie comes LAST: the metadata above
+              is reference material you skim, so the page reads title -> what it
+              is -> what we do about it. A labelled rule marks the change of
+              subject — the same one the watched board puts between months. */}
+          <h2 className="section-label actions-label">Watch &amp; rate</h2>
+          <section className="detail-actions">
+            <section className="watch-panel">
             {watched && item.watched_on ? (
               <label className="watch-control watch-date">
                 <span>Watched on</span>
@@ -165,7 +204,7 @@ export default function MovieDetailPage() {
             <DropdownMenu
               label="Movie options"
               triggerClassName="more-btn watch-more"
-              trigger="⋯"
+              trigger={<DotsIcon />}
             >
               {(close) => (
                 <>
@@ -198,31 +237,21 @@ export default function MovieDetailPage() {
                 </>
               )}
             </DropdownMenu>
+            </section>
+
+            {dateError && <p className="error">{dateError.message}</p>}
+
+            {/* Grouped with the watch control because both are things you DO
+                here — not because the two facts are related. They stay
+                independent (docs/design.md §12); only the affordances are
+                neighbours. */}
+            <RatingControl
+              item={item}
+              listId={id}
+              members={list?.members ?? []}
+              meId={me?.id}
+            />
           </section>
-
-          {dateError && <p className="error">{dateError.message}</p>}
-
-          {(detail?.overview ?? item.overview) && (
-            <p className="detail-overview">{detail?.overview ?? item.overview}</p>
-          )}
-
-          {detail?.director && (
-            <p className="detail-credit">
-              <span className="muted">Director</span> {detail.director}
-            </p>
-          )}
-          {detail && detail.cast.length > 0 && (
-            <p className="detail-credit">
-              <span className="muted">Cast</span> {detail.cast.join(", ")}
-            </p>
-          )}
-
-          {!detail && !detailPending && (
-            <p className="muted">
-              Couldn’t reach TMDB for the full details — showing what we saved when
-              this movie was added.
-            </p>
-          )}
         </div>
       </article>
 

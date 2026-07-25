@@ -146,6 +146,37 @@ class ItemUpdate(BaseModel):
         return "watched_on" in self.model_fields_set
 
 
+# --- Ratings (M8) --------------------------------------------------------
+# Two values, no zero. "No opinion" is the absence of a rating, not a third
+# value — so this Literal is the CHECK constraint, restated at the boundary.
+RatingValue = Literal[1, -1]
+
+
+class RatingIn(BaseModel):
+    value: RatingValue
+
+
+class RatingOut(BaseModel):
+    """One member's verdict, as it appears on an item.
+
+    Carries `user_id` alone rather than a nested user: every page that renders
+    these has already loaded the list's members (and their avatars), so naming
+    people here would repeat every member across every card for nothing.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: uuid.UUID
+    value: RatingValue
+
+
+class MyRatingOut(BaseModel):
+    """What a write returns — the caller already knows who they are."""
+
+    item_id: uuid.UUID
+    value: RatingValue
+
+
 class ItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -160,6 +191,10 @@ class ItemOut(BaseModel):
     # Null iff status is want_to_watch — the DB CHECK guarantees it.
     watched_on: date | None = None
     created_at: datetime
+    # Verdicts from this list's members on THIS item (M8) — a rating is scoped
+    # to the list, so the same film in another list has its own. Independent of
+    # `status`: a want_to_watch item can carry verdicts, un-watching clears none.
+    ratings: list[RatingOut] = []
 
 
 # --- Invites -------------------------------------------------------------

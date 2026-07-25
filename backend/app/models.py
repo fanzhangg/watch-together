@@ -19,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     UniqueConstraint,
     Uuid,
@@ -35,11 +36,15 @@ __all__ = [
     "ListMember",
     "ListItem",
     "Invite",
+    "ItemRating",
     "ROLE_OWNER",
     "ROLE_MEMBER",
     "STATUS_WANT",
     "STATUS_WATCHED",
     "STATUSES",
+    "RATING_UP",
+    "RATING_DOWN",
+    "RATING_VALUES",
 ]
 
 ROLE_OWNER = "owner"
@@ -48,6 +53,10 @@ ROLE_MEMBER = "member"
 STATUS_WANT = "want_to_watch"
 STATUS_WATCHED = "watched"
 STATUSES = (STATUS_WANT, STATUS_WATCHED)
+
+RATING_UP = 1
+RATING_DOWN = -1
+RATING_VALUES = (RATING_DOWN, RATING_UP)
 
 
 class User(Base):
@@ -158,5 +167,55 @@ class ListItem(Base):
     # pick one and gets the day wrong for an evening viewing. Null iff not watched.
     watched_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ItemRating(Base):
+    """One member's verdict on one movie in one list — thumbs up or down (M8).
+
+    Scoped to the **list item**, not to the film globally: a thumb is a social
+    gesture aimed at the people in that list, so it stays inside it. Rate the
+    same film in two different lists and those are two separate, unrelated
+    remarks — which is what you'd expect of something said in two different
+    rooms.
+
+    That scope makes privacy **structural** rather than a query convention. The
+    FK below is inside `list_items`, which carries `list_id`, which every route
+    already gates on membership — so a verdict cannot physically reach someone
+    outside the list, whatever a future query gets wrong. It also means a
+    verdict dies with the movie: remove the film and the opinions about it go
+    with it, instead of ambushing you when someone re-adds it a year later.
+
+    **Nothing ties this to the item's watch status**, deliberately — see
+    docs/design.md §12. A watch status belongs to the list ("we watched it"); a
+    verdict belongs to a person ("I liked it"). Because no invariant spans the
+    two, no member's action can invalidate another member's data, and the
+    earlier drafts' unanswerable question ("someone un-watched a film you rated
+    — now what?") simply doesn't arise.
+    """
+
+    __tablename__ = "item_ratings"
+    __table_args__ = (
+        # Two values, no null, no zero. "No opinion" is the absence of a row,
+        # so this stays total rather than growing a third meaning.
+        CheckConstraint("value IN (-1, 1)", name="ck_item_ratings_value"),
+    )
+
+    # list_item_id leads the primary key because every read is item-first
+    # ("verdicts on these 40 movies"), so the PK index serves them directly and
+    # no secondary index is needed.
+    list_item_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("list_items.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    value: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    # Nothing reads this in M8. It's here because it cannot be backfilled: without
+    # it, "what did we think of this last year" is unanswerable forever. It also
+    # dates a verdict relative to list_items.watched_on, which is what a future
+    # "Fang liked this *before* watching it" label would need.
+    rated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
