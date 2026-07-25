@@ -250,7 +250,14 @@ changing the watch date — is on the detail page.
 midnight, so `toLocaleDateString()` renders it as the *11th* anywhere west of
 Greenwich — the exact off-by-one-day bug we moved to a `DATE` column to avoid.
 All conversion goes through the helpers in `types.ts` (`parseLocalDate`,
-`todayISO`, `formatWatchedDate`); nothing else touches the raw string.
+`todayISO`, `formatWatchMonth`); nothing else touches the raw string.
+
+The watched board carries no per-card date at all. It is split into month runs
+under `.month-title` sub-headers ("July 2026"), newest first — the month is how
+you actually look something up, and it says once what a stamp on every poster
+was saying twenty times over the artwork. The exact day stays on the detail
+page, where it's editable. Grouping keys off `watched_on.slice(0, 7)` rather
+than a `Date`: `"2026-07"` sorts as a string and can't drift across a timezone.
 
 ---
 

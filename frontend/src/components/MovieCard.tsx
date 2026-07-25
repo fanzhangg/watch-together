@@ -1,15 +1,18 @@
 import { Link } from "react-router-dom";
-import { formatWatchedDate, posterUrl, type Item } from "../types";
+import { posterUrl, type Item } from "../types";
 import EyeIcon from "./EyeIcon";
 
 /**
- * The poster — and, once watched, the date stamped across it like a postmark.
+ * The poster, and nothing else.
  *
  * An unwatched card carries one control: a tick that marks it watched, today.
  * It's a button, not a menu, deliberately — a popover hung off a ~160px poster
  * is what produced the clipping and off-screen bugs this card used to have.
  * Everything else, including anything destructive, lives on the detail page.
- * A watched card has no control at all: its stamp says what it needs to.
+ * A watched card has no control at all, and no date either: the board groups
+ * watched movies under a month sub-header, so repeating the date on every
+ * poster would say the same thing 20 times over the artwork. The exact day
+ * lives on the detail page, where it's editable.
  *
  * The title isn't rendered: the poster already carries it, far better than we
  * could. It moves to the link's aria-label so the card still has an accessible
@@ -43,11 +46,6 @@ export default function MovieCard({
           <div className="poster placeholder">
             <span aria-hidden="true">🎞️</span>
             <span className="movie-title">{item.title}</span>
-          </div>
-        )}
-        {watched && item.watched_on && (
-          <div className="watch-stamp">
-            <span className="movie-watched">{formatWatchedDate(item.watched_on)}</span>
           </div>
         )}
       </Link>

@@ -102,12 +102,10 @@ export function todayISO(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** "2026-07-12" -> "Sun, Jul 12, 2026" */
-export function formatWatchedDate(iso: string): string {
+/** "2026-07-12" -> "July 2026" — the sub-header the watched board groups under. */
+export function formatWatchMonth(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
+    month: "long",
     year: "numeric",
   });
 }

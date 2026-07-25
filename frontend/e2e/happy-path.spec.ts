@@ -49,28 +49,27 @@ test("sign in, create a list, add a movie, mark watched, invite", async ({ page 
     .filter({ has: page.getByRole("link", { name: "The Matrix" }) });
   await expect(watchedCard).toBeVisible();
 
-  // The card shows TODAY — as the browser itself reckons it. This is the guard
-  // against parsing the API's "2026-07-12" as UTC midnight, which would render
-  // as *yesterday* anywhere west of Greenwich (design.md risk #9). Computing the
+  // It lands under THIS month's sub-header — as the browser itself reckons the
+  // month. This is the guard against parsing the API's "2026-07-12" as UTC
+  // midnight, which west of Greenwich renders as the day before: on the 1st,
+  // that's the *previous month's* heading (design.md risk #9). Computing the
   // expectation in the page keeps it honest about locale and timezone.
-  const today = await page.evaluate(() =>
-    new Date().toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
+  const thisMonth = await page.evaluate(() =>
+    new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" }),
   );
-  await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
+  const watchedMonth = page
+    .locator(".watch-month")
+    .filter({ has: page.getByRole("link", { name: "The Matrix" }) });
+  await expect(watchedMonth.locator(".month-title")).toHaveText(thisMonth);
 
-  // Once watched, the card carries no control at all — the stamp says it, and
-  // unwatching lives on the detail page.
+  // Once watched, the card carries no control at all — and no date either; the
+  // month sub-header carries that. Unwatching lives on the detail page.
   await expect(watchedCard.getByRole("button")).toHaveCount(0);
 
   // Survives a reload — it was really persisted, not just optimistic UI.
   await page.reload();
   await expect(watchedCard).toBeVisible();
-  await expect(watchedCard.locator(".movie-watched")).toHaveText(today);
+  await expect(watchedMonth.locator(".month-title")).toHaveText(thisMonth);
 
   // --- invite link (opens in a modal) ---
   await page.getByRole("button", { name: /Invite/ }).click();
@@ -122,11 +121,18 @@ test("open a movie, correct the date we actually watched it", async ({ page }) =
   // The picker IS the watch date — there's no formatted copy of it to check.
   await page.getByLabel("Watch date").fill("2026-07-04");
 
-  // It really persisted — and the list shows the corrected date, not today.
+  // It really persisted — and on the board the movie has moved to the July 2026
+  // group, not whichever month today falls in.
   await page.reload();
   await expect(page.getByLabel("Watch date")).toHaveValue("2026-07-04");
   await page.getByRole("link", { name: new RegExp(listName) }).click();
-  await expect(card.locator(".movie-watched")).toHaveText("Sat, Jul 4, 2026");
+  await expect(card).toBeVisible();
+  await expect(
+    page
+      .locator(".watch-month")
+      .filter({ has: page.getByRole("link", { name: "The Matrix" }) })
+      .locator(".month-title"),
+  ).toHaveText("July 2026");
 
   await deleteOpenList(page);
 });

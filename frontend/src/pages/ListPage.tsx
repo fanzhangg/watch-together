@@ -9,7 +9,40 @@ import InviteButton from "../components/InviteButton";
 import ListNameDialog from "../components/ListNameDialog";
 import MovieCard from "../components/MovieCard";
 import MovieSearchDialog from "../components/MovieSearchDialog";
-import { todayISO, type Item, type ListDetail } from "../types";
+import { formatWatchMonth, todayISO, type Item, type ListDetail } from "../types";
+
+/** A run of watched movies sharing a calendar month, newest month first. */
+interface WatchMonth {
+  /** "2026-07" — sorts as a string, and can't drift a day across a timezone. */
+  key: string;
+  label: string;
+  items: Item[];
+}
+
+/**
+ * Split the watched movies into month runs for the board's sub-headers.
+ *
+ * Takes them already sorted newest-first, so a month is just a consecutive run
+ * of the same key — no map, no re-sorting, and the months come out in the same
+ * order the movies were in.
+ */
+function byWatchMonth(items: Item[]): WatchMonth[] {
+  const months: WatchMonth[] = [];
+  for (const item of items) {
+    const key = (item.watched_on ?? "").slice(0, 7);
+    const open = months[months.length - 1];
+    if (open?.key === key) {
+      open.items.push(item);
+    } else {
+      months.push({
+        key,
+        label: item.watched_on ? formatWatchMonth(item.watched_on) : "No date",
+        items: [item],
+      });
+    }
+  }
+  return months;
+}
 
 export default function ListPage() {
   const { id = "" } = useParams();
@@ -91,6 +124,7 @@ export default function ListPage() {
       (b.watched_on ?? "").localeCompare(a.watched_on ?? "") ||
       b.created_at.localeCompare(a.created_at),
   );
+  const watchedMonths = byWatchMonth(watched);
   const existingTmdbIds = new Set((items ?? []).map((i) => i.tmdb_id));
 
   return (
@@ -191,13 +225,21 @@ export default function ListPage() {
       {watched.length > 0 && (
         <>
           <h2 className="section-title">Watched</h2>
-          <div className="movie-grid">
-            {/* No onWatch: a watched card has no control. Unwatching is on the
-                detail page. */}
-            {watched.map((item) => (
-              <MovieCard key={item.id} item={item} listId={id} />
-            ))}
-          </div>
+          {/* One grid per month, under its own sub-header — the month is how
+              you find something you watched, and it replaces the date that
+              used to be stamped on every poster. */}
+          {watchedMonths.map((month) => (
+            <section key={month.key} className="watch-month">
+              <h3 className="month-title">{month.label}</h3>
+              <div className="movie-grid">
+                {/* No onWatch: a watched card has no control. Unwatching is on
+                    the detail page. */}
+                {month.items.map((item) => (
+                  <MovieCard key={item.id} item={item} listId={id} />
+                ))}
+              </div>
+            </section>
+          ))}
         </>
       )}
 
