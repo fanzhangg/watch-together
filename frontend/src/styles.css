@@ -905,7 +905,11 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
    until there's genuinely room for two. */
 .movie-rows {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  /* min() is load-bearing: a bare minmax(440px, 1fr) keeps a 440px FLOOR even
+     when the container is 350px, so every track overflowed to the right on a
+     phone. Capping the floor at 100% lets it collapse to one full-width column
+     instead. */
+  grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr));
   gap: 0.6rem;
   align-items: start;
 }
@@ -994,4 +998,20 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
     border-color: var(--accent);
     color: var(--text);
   }
+}
+
+/* --- list rows on a phone -----------------------------------------------
+   MUST come after the base .movie-row rules above: a media query adds no
+   specificity, so an override placed earlier in the file loses on source order.
+   (It did -- these were written into the main mobile block first and silently
+   never applied.)
+
+   Buying back width for the status line: at 390px the corner reserve sized for a
+   desktop row left "Wishlisted on Jul 25, 2026" wrapping with the year alone on
+   the second line. The three buttons only need ~116px. */
+@media (max-width: 640px) {
+  .row-poster { width: 52px; }
+  .row-body { padding-right: 7.4rem; }
+  .row-title { font-size: 0.95rem; }
+  .row-status { font-size: 0.8rem; }
 }
