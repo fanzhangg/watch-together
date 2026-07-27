@@ -420,7 +420,11 @@ input:focus-visible, button:focus-visible {
   color: var(--muted);
   font-size: 0.9rem;
 }
-.detail-meta > span:not(.chip) + span:not(.chip)::before {
+.detail-genres { display: contents; }
+/* Dot between the plain facts only. Written as an explicit class rather than
+   :not(.chip): the genre WRAPPER is also a plain span, so a negative selector
+   handed it a separator of its own and left a stray "·" leading the genre row. */
+.detail-fact + .detail-fact::before {
   content: "·";
   margin-right: 0.5rem;
 }
@@ -1014,4 +1018,21 @@ button.watch-control { font-size: 1rem; font-weight: 550; }
   .row-body { padding-right: 7.4rem; }
   .row-title { font-size: 0.95rem; }
   .row-status { font-size: 0.8rem; }
+
+  /* Genres get their own line. Year and runtime are two short labels; genres
+     are an open-ended set, so sharing a row means the count of them decides
+     whether the block is one line or two. flex-basis forces the break. */
+  .detail-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    flex-basis: 100%;
+  }
+
+  /* Fill the width instead of stopping at --action-row (356px). On a phone
+     wider than ~396px the container is wider than that, so the controls ended
+     46px short of the right edge while every other block reached it -- the rows
+     lined up with each other but not with the page. */
+  .watch-panel,
+  .rating-panel { width: 100%; }
 }

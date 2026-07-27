@@ -126,13 +126,24 @@ export default function MovieDetailPage() {
               the film — so they share one wrapping row instead of three stacked
               blocks. The metadata is here to be glanced at, not read. */}
           <div className="detail-meta">
-            {item.release_year && <span>{item.release_year}</span>}
-            {detail?.runtime && <span>{runtimeLabel(detail.runtime)}</span>}
-            {detail?.genres.map((genre) => (
-              <span className="chip" key={genre}>
-                {genre}
+            {item.release_year && (
+              <span className="detail-fact">{item.release_year}</span>
+            )}
+            {detail?.runtime && (
+              <span className="detail-fact">{runtimeLabel(detail.runtime)}</span>
+            )}
+            {/* Wrapped so the phone can drop the whole set onto its own line.
+                On a wide screen it's `display: contents`, so the chips stay
+                direct children of the meta row and nothing changes. */}
+            {detail && detail.genres.length > 0 && (
+              <span className="detail-genres">
+                {detail.genres.map((genre) => (
+                  <span className="chip" key={genre}>
+                    {genre}
+                  </span>
+                ))}
               </span>
-            ))}
+            )}
           </div>
 
           {detail?.tagline && <p className="detail-tagline">“{detail.tagline}”</p>}
